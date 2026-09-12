@@ -142,11 +142,7 @@ model Tag {
 model News {
   id           Int            @id @default(autoincrement()) @map("id")
   title        String         @map("title")
-  image        String         @map("image")
   thumbnail    String?        @map("thumbnail")
-  highlight    String?        @map("highlight")
-  cardFocalPointX Float?      @map("card_focal_point_x")
-  cardFocalPointY Float?      @map("card_focal_point_y")
   thumbnailFocalPointX Float? @map("thumbnail_focal_point_x")
   thumbnailFocalPointY Float? @map("thumbnail_focal_point_y")
   detail       String         @map("detail")

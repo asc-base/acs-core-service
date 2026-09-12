@@ -10,6 +10,7 @@ import {
   NewsFeatureUpsertPayload,
   NewsAdditionalImage,
   NewsAdditionalImageCreatePayload,
+  NewsWithAdditionalImages,
 } from "../modules/news/domain/news";
 import { AppError } from "../core/error/app-error";
 import { ErrorCode } from "../core/types/errors";
@@ -20,7 +21,7 @@ export class NewsRepository implements INewsRepository {
 
   async createNews(data: NewsCreatePayload): Promise<News> {
     //
-    const news = await this.db.news.create({ data, include: { tag: true }, });
+    const news = await this.db.news.create({ data, include: { tag: true , newsAdditionalImages: true}, });
     return {
       ...news,
       tag: news.tag
@@ -72,14 +73,14 @@ export class NewsRepository implements INewsRepository {
     }));
   }
 
-  async getNewsById(id: number): Promise<News | null> {
+  async getNewsById(id: number): Promise<NewsWithAdditionalImages | null> {
     try {
       const news = await this.db.news.findUnique({
         where: { id, deletedAt: null },
         include: {
           tag: true,
           newsAdditionalImages: {
-            where: { deletedAt: null },
+            where: { newsID: id , deletedAt: null },
           },
         }
       });
@@ -305,14 +306,26 @@ export class NewsRepository implements INewsRepository {
   async updateNews(
     newsID: number,
     data: NewsUpdatePayload
-  ): Promise<News | null> {
-    try {
+  ): Promise<News> {
+
+    const {
+  tagID,
+  ...newsData
+} = data;
       const news = await this.db.news.update({
         where: { id: newsID },
-        data,
-        include: {
-          tag: true,
+        data : {
+          ...newsData,
+
+    ...(tagID !== undefined && {
+      tag: {
+        connect: {
+          id: tagID,
         },
+      },
+    }),
+        },
+        include: { tag: true , newsAdditionalImages: true},
       });
       return {
         ...news,
@@ -323,35 +336,43 @@ export class NewsRepository implements INewsRepository {
           }
           : undefined,
       };
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === "P2025") {
-          return null;
-        }
-      }
-      throw new AppError(
-        ErrorCode.DATABASE_ERROR,
-        "Database error occurred",
-        500,
-      );
-    }
   }
 
-  async createNewsAdditionalImage(
-    data: NewsAdditionalImageCreatePayload,
-  ): Promise<NewsAdditionalImage> {
-    const createData: Prisma.NewsAdditionalImageUncheckedCreateInput = {
-      newsID: data.newsID,
-      imageUrl: data.imageUrl,
-      createdBy: data.createdBy ?? 0,
-      updatedBy: data.updatedBy ?? 0,
-    };
-    return await this.db.newsAdditionalImage.create({ data: createData });
-  }
+async createNewsAdditionalImages(
+  data: NewsAdditionalImageCreatePayload[],
+): Promise<NewsAdditionalImage[]> {
+  const createData: Prisma.NewsAdditionalImageCreateManyInput[] =
+    data.map((item) => ({
+      newsID: item.newsID,
+      imageUrl: item.imageUrl,
+      createdBy: item.createdBy ?? 0,
+      updatedBy: item.updatedBy ?? 0,
+    }));
+
+  return await this.db.newsAdditionalImage.createManyAndReturn({
+    data: createData,
+  });
+}
 
   async getNewsAdditionalImagesByNewsId(newsID: number): Promise<NewsAdditionalImage[]> {
     return await this.db.newsAdditionalImage.findMany({
       where: { newsID, deletedAt: null },
     });
   }
+
+  async deleteNewsAdditionalImages(
+  data: number[],
+): Promise<NewsAdditionalImage[]> {
+  return await this.db.newsAdditionalImage.updateManyAndReturn({
+    where: {
+      id: {
+        in: data,
+      },
+    },
+    data: {
+      deletedAt: new Date(),
+    },
+  });
 }
+}
+

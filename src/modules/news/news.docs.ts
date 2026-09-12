@@ -7,6 +7,7 @@ import {
   UpsertNewsFeatureDTO,
   QueryNewsFeatureParams,
   NewsUpdateDTO,
+  NewsWithAdditionalImageDTO,
 } from "./domain/news";
 import { mapResponse } from "../../core/interceptor/response";
 import { Pageable } from "../../core/models";
@@ -29,7 +30,7 @@ export const NewsDocs = {
     },
     body: CreateNewsDTO,
     response: {
-      201: mapResponse(NewsDTO),
+      201: mapResponse(NewsWithAdditionalImageDTO),
     },
   },
   getNews: {
@@ -50,7 +51,7 @@ export const NewsDocs = {
       tags: ["News"],
     },
     response: {
-      200: mapResponse(NewsDTO),
+      200: mapResponse(NewsWithAdditionalImageDTO),
       404: mapResponse(t.Null()),
     },
   },
@@ -126,7 +127,7 @@ export const NewsDocs = {
     }),
     body: NewsUpdateDTO,
     response: {
-      200: mapResponse(NewsDTO),
+      200: mapResponse(NewsWithAdditionalImageDTO),
     },
   },
 };

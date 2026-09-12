@@ -10,15 +10,11 @@ const CommonNewsFields = {
 };
 
 const FocalPointInputFields = {
-  cardFocalPointX: t.Optional(t.Numeric()),
-  cardFocalPointY: t.Optional(t.Numeric()),
   thumbnailFocalPointX: t.Optional(t.Numeric()),
   thumbnailFocalPointY: t.Optional(t.Numeric()),
 };
 
 const FocalPointResponseFields = {
-  cardFocalPointX: t.Optional(t.Nullable(t.Number())),
-  cardFocalPointY: t.Optional(t.Nullable(t.Number())),
   thumbnailFocalPointX: t.Optional(t.Nullable(t.Number())),
   thumbnailFocalPointY: t.Optional(t.Nullable(t.Number())),
 };
@@ -27,7 +23,6 @@ export const CreateNewsDTO = t.Object({
   ...CommonNewsFields,
   ...FocalPointInputFields,
   thumbnail: t.File(),
-  highlight: t.File(),
   tagID: t.Numeric(), // ✨ แก้ปัญหา "Expected number" ให้อัตโนมัติ
   additionalImages: t.Optional(t.Files()),
 });
@@ -38,7 +33,6 @@ export const NewsSchema = t.Intersect([
     ...CommonNewsFields,
     image: t.String(),
     thumbnail: t.Nullable(t.String()),
-    highlight: t.Nullable(t.String()),
     ...FocalPointResponseFields,
     tagID: t.Numeric(),
     tag: t.Optional(Tag),
@@ -49,7 +43,6 @@ export const NewsSchema = t.Intersect([
 export const NewsDTO = t.Object({
   id: t.Number(),
   thumbnailURL: t.Nullable(t.String()),
-  highlightURL: t.Nullable(t.String()),
   ...CommonNewsFields,
   ...FocalPointResponseFields,
   tag: t.Optional(Tag),
@@ -60,8 +53,9 @@ export const NewsUpdateDTO = t.Partial(
     ...CommonNewsFields,
     ...FocalPointInputFields,
     thumbnail: t.File(),
-    highlight: t.File(),
     tagID: t.Numeric(),
+    deletedAdditionalImagesId: t.Array(t.Number()),
+    newAdditionalImages: t.Optional(t.Files()),
   }),
 );
 
@@ -136,14 +130,16 @@ export const NewsWithAdditionalImageSchema = t.Intersect([
   }),
 ]);
 
+export const NewsAdditionalImageDTO = t.Intersect([
+  t.Object({
+    id: t.Number(),
+    imageUrl: t.String(),
+  }),
+]);
+
 export const NewsWithAdditionalImageDTO = t.Object({
   ...NewsDTO.properties,
-  newsAdditionalImages: t.Array(
-    t.Object({
-      newsID: t.Number(),
-      imageUrl: t.String(),
-    }),
-  ),
+  newsAdditionalImages: t.Array(NewsAdditionalImageDTO),
 });
 
 export const NewsCreatePayloadSchema = t.Object({
@@ -151,7 +147,6 @@ export const NewsCreatePayloadSchema = t.Object({
   ...FocalPointInputFields,
   image: t.String(),
   thumbnail: t.String(),
-  highlight: t.String(),
   tagID: t.Numeric(),
   createdBy: t.Number(),
   updatedBy: t.Number(),
@@ -162,7 +157,6 @@ export const NewsUpdatePayloadSchema = t.Partial(
     ...CommonNewsFields,
     ...FocalPointInputFields,
     thumbnail: t.String(),
-    highlight: t.String(),
     tagID: t.Numeric(),
     updatedBy: t.Number(),
     updatedAt: t.Date(),
@@ -198,7 +192,5 @@ export type NewsUpdatePayload = Static<typeof NewsUpdatePayloadSchema>;
 export type NewsFeatureUpsertPayload = Static<typeof NewsFeaturUpsertPayloadSchema>;
 export type NewsAdditionalImage = Static<typeof NewsAdditionalImageSchema>;
 export type NewsAdditionalImageCreatePayload = Static<typeof NewsAdditionalImageCreatePayloadSchema>;
-export type NewsWithAdditionalImages = News & {
-  newsAdditionalImages: NewsAdditionalImage[];
-};
+export type NewsWithAdditionalImages = Static<typeof NewsWithAdditionalImageSchema>;
 export type NewsWithAdditionalImageDTO = Static<typeof NewsWithAdditionalImageDTO>; 

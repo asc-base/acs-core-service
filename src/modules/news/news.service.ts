@@ -11,10 +11,11 @@ import {
   UpsertNewsFeatureDTO,
   QueryNewsFeatureParams,
   NewsUpdateDTO,
-  News,
   NewsCreatePayload,
   NewsUpdatePayload,
   NewsFeatureUpsertPayload,
+  NewsAdditionalImageCreatePayload,
+  NewsAdditionalImage,
 } from "./domain/news";
 import { INewsRepository } from "./domain/news.repository";
 import { NewsFactory } from "./news.factory";
@@ -43,14 +44,18 @@ export class NewsService implements INewsService {
   async createNews(
     data: CreateNewsDTO,
     userId: number,
-    additionalImageUrls?: string[],
   ): Promise<NewsDTO> {
-    const thumbnailFile = data.thumbnail;
-    const highlightFile = data.highlight;
-    let uploadedThumbnailPath: string | null = null; // เก็บ path ไว้ลบทีหลัง
-    let uploadedHighlightPath: string | null = null; // เก็บ path ไว้ลบทีหลัง
+        const {
+      thumbnail,
+      additionalImages,
+      ...newsFields
+    } = data;
+
+    let uploadedThumbnailPath: string | null = null;
+    let uploadedAdditionalImages: string[] = [];
+
     try {
-      if (!thumbnailFile || !highlightFile) {
+      if (!thumbnail) {
         throw new AppError(
           ErrorCode.VALIDATION_ERROR,
           "Thumbnail and highlight files are required",
@@ -58,52 +63,65 @@ export class NewsService implements INewsService {
         );
       }
 
+      // Upload thumbnail
       uploadedThumbnailPath = await this.storageService.uploadFile(
-        thumbnailFile,
+        thumbnail,
         "news-thumbnail",
       );
-      uploadedHighlightPath = await this.storageService.uploadFile(
-        highlightFile,
-        "news-highlight",
-      );
 
-      const newsData: NewsCreatePayload = {
-        ...data,
-        // Keep the legacy image column populated while consumers migrate to thumbnail.
-        image: uploadedThumbnailPath,
-        thumbnail: uploadedThumbnailPath,
-        highlight: uploadedHighlightPath,
-        createdBy: 0,
-        updatedBy: 0,
-      };
-      const news = await this.newsRepository.createNews(newsData);
-
-      if (additionalImageUrls && additionalImageUrls.length > 0) {
-        await Promise.all(
-          additionalImageUrls.map((imageUrl) =>
-            this.newsRepository.createNewsAdditionalImage({
-              newsID: news.id,
-              imageUrl,
-              createdBy: userId,
-              updatedBy: userId,
-            }),
+      // Upload additional images
+      if (additionalImages?.length) {
+        uploadedAdditionalImages = await Promise.all(
+          additionalImages.map((file) =>
+            this.storageService.uploadFile(
+              file,
+              "news-additionalImage",
+            ),
           ),
         );
       }
 
-      return this.newsFactory.mapNewsToDTO(news);
+      // Create news
+      const newsData: NewsCreatePayload = {
+        ...newsFields,
+        image: uploadedThumbnailPath,
+        thumbnail: uploadedThumbnailPath,
+        createdBy: userId,
+        updatedBy: userId,
+      };
+
+      const news = await this.newsRepository.createNews(newsData);
+
+      // Create additional images
+      let newsAdditionalImages: NewsAdditionalImage[] = [];
+
+      if (uploadedAdditionalImages.length > 0) {
+        const additionalImageData: NewsAdditionalImageCreatePayload[] =
+          uploadedAdditionalImages.map((imageUrl) => ({
+            newsID: news.id,
+            imageUrl,
+            createdBy: userId,
+            updatedBy: userId,
+          }));
+
+        newsAdditionalImages =
+          await this.newsRepository.createNewsAdditionalImages(
+            additionalImageData,
+          );
+      }
+
+      const newsWithAdditionalImages = {
+        ...news,
+        newsAdditionalImages,
+      };
+
+      return this.newsFactory.mapNewsWithAdditionalImageToDTO(
+        newsWithAdditionalImages,
+      );
     } catch (error) {
       if (uploadedThumbnailPath) {
         await this.storageService
           .deleteFile(uploadedThumbnailPath)
-          .catch((err) => {
-            console.error("🔥 Failed to delete file during rollback:", err);
-          });
-      }
-
-      if (uploadedHighlightPath) {
-        await this.storageService
-          .deleteFile(uploadedHighlightPath)
           .catch((err) => {
             console.error("🔥 Failed to delete file during rollback:", err);
           });
@@ -134,11 +152,7 @@ export class NewsService implements INewsService {
         return null;
       }
 
-      const newsWithImages = {
-        ...news,
-        newsAdditionalImages: await this.newsRepository.getNewsAdditionalImagesByNewsId(id),
-      };
-      return this.newsFactory.mapNewsWithAdditionalImageToDTO(newsWithImages);
+      return this.newsFactory.mapNewsWithAdditionalImageToDTO(news);
 
     } catch (error) {
       if (
@@ -263,48 +277,95 @@ export class NewsService implements INewsService {
   }
 
   async updateNews(
-    newsID: number,
-    data: NewsUpdateDTO,
-    userID: number,
-  ): Promise<NewsDTO> {
-    const { thumbnail, highlight, ...newsData } = data;
-    let thumbnailPath: string | undefined = undefined;
-    let highlightPath: string | undefined = undefined;
+  newsID: number,
+  data: NewsUpdateDTO,
+  userID: number,
+): Promise<NewsWithAdditionalImageDTO> {
+  const {
+    thumbnail,
+    deletedAdditionalImagesId,
+    newAdditionalImages,
+    ...newsData
+  } = data;
 
-    try {
-      if (thumbnail) {
-        thumbnailPath = await this.storageService.uploadFile(
-          thumbnail,
-          "news-thumbnail",
-        );
-      }
-      if (highlight) {
-        highlightPath = await this.storageService.uploadFile(
-          highlight,
-          "news-highlight",
-        );
-      }
-      const updateNewsData: NewsUpdatePayload = {
-        ...(thumbnail && { thumbnail: thumbnailPath }),
-        ...(highlight && { highlight: highlightPath }),
-        ...newsData,
-        updatedBy: userID,
-        updatedAt: new Date(),
-      };
+  let thumbnailPath: string | undefined;
+  let uploadedAdditionalImages: string[] = [];
 
-      const news = await this.newsRepository.updateNews(newsID, updateNewsData);
-
-      if (!news) {
-        throw new AppError(
-          ErrorCode.NOT_FOUND_ERROR,
-          "News not found",
-          HttpStatusCode.NOT_FOUND,
-        );
-      }
-      return this.newsFactory.mapNewsToDTO(news);
-    } catch (error) {
-      console.log(error);
-      throw error;
+  try {
+    if (thumbnail) {
+      thumbnailPath = await this.storageService.uploadFile(
+        thumbnail,
+        "news-thumbnail",
+      );
     }
+
+    if (newAdditionalImages?.length) {
+      uploadedAdditionalImages = await Promise.all(
+        newAdditionalImages.map((file) =>
+          this.storageService.uploadFile(
+            file,
+            "news-additionalImage",
+          ),
+        ),
+      );
+    }
+
+    const updateNewsData: NewsUpdatePayload = {
+      ...newsData,
+      ...(thumbnailPath && {
+        thumbnail: thumbnailPath,
+      }),
+      updatedBy: userID,
+      updatedAt: new Date(),
+    };
+
+    const news = await this.newsRepository.updateNews(
+      newsID,
+      updateNewsData,
+    );
+
+    if (!news) {
+      throw new AppError(
+        ErrorCode.NOT_FOUND_ERROR,
+        "News not found",
+        HttpStatusCode.NOT_FOUND,
+      );
+    }
+
+    let newsAdditionalImages: NewsAdditionalImage[] = [];
+
+    if (uploadedAdditionalImages.length > 0) {
+      const additionalImageData: NewsAdditionalImageCreatePayload[] =
+        uploadedAdditionalImages.map((imageUrl) => ({
+          newsID: news.id,
+          imageUrl,
+          createdBy: userID,
+          updatedBy: userID,
+        }));
+
+      newsAdditionalImages =
+        await this.newsRepository.createNewsAdditionalImages(
+          additionalImageData,
+        );
+    }
+
+    if (deletedAdditionalImagesId?.length) {
+      await this.newsRepository.deleteNewsAdditionalImages(
+        deletedAdditionalImagesId,
+      );
+    }
+
+    const newsWithAdditionalImages = {
+      ...news,
+      newsAdditionalImages,
+    };
+
+    return this.newsFactory.mapNewsWithAdditionalImageToDTO(
+      newsWithAdditionalImages,
+    );
+  } catch (error) {
+    console.log(error);
+    throw error;
   }
+}
 }
