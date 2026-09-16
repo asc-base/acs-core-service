@@ -19,7 +19,7 @@ export class ProfessorFactory implements IProfessorFactory {
         ? professor.expertFields?.split("/").map((field) => field.trim()).filter((field) => field.length > 0)
         : [],
       educations: professor.educations
-        ? professor.educations?.split("/").map((edu) => edu.trim())
+        ? professor.educations?.split("/").map((edu) => edu.trim()).filter((edu) => edu.length > 0)
         : [],
     };
   }
