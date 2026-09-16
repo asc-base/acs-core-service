@@ -65,6 +65,13 @@ export const ProfessorDocs = {
       tags: ["Professors"],
     },
     transform({ body }: { body: ProfessorUpdateDTO }) {
+      if (body.expertFields != null && body.expertFields !== "") {
+        body.expertFields = body.expertFields.replaceAll(",", "/");
+      }
+      if (body.educations != null && body.educations !== "") {
+        body.educations = body.educations.replaceAll(",", "/");
+      }
+
       Object.keys(body).forEach((key) => {
         const k = key as keyof ProfessorUpdateDTO;
         if (body[k] === "") {
