@@ -16,7 +16,7 @@ export class ProfessorFactory implements IProfessorFactory {
       user: this.userFactory.mapUserToDTO(professor.user),
       phone: professor.phone,
       expertFields: professor.expertFields
-        ? professor.expertFields?.split("/").map((field) => field.trim())
+        ? professor.expertFields?.split("/").map((field) => field.trim()).filter((field) => field.length > 0)
         : [],
       educations: professor.educations
         ? professor.educations?.split("/").map((edu) => edu.trim())
