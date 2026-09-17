@@ -84,7 +84,6 @@ export class NewsService implements INewsService {
       // Create news
       const newsData: NewsCreatePayload = {
         ...newsFields,
-        image: uploadedThumbnailPath,
         thumbnail: uploadedThumbnailPath,
         createdBy: userId,
         updatedBy: userId,

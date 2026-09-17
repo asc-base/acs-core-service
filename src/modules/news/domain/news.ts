@@ -31,7 +31,6 @@ export const NewsSchema = t.Intersect([
   t.Object({
     id: t.Number(),
     ...CommonNewsFields,
-    image: t.String(),
     thumbnail: t.Nullable(t.String()),
     ...FocalPointResponseFields,
     tagID: t.Numeric(),
@@ -145,7 +144,6 @@ export const NewsWithAdditionalImageDTO = t.Object({
 export const NewsCreatePayloadSchema = t.Object({
   ...CommonNewsFields,
   ...FocalPointInputFields,
-  image: t.String(),
   thumbnail: t.String(),
   tagID: t.Numeric(),
   createdBy: t.Number(),
