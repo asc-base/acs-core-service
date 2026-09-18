@@ -5,7 +5,6 @@
 UPDATE "news"
 SET "thumbnail" = "image"
 WHERE "image" IS NOT NULL
-  AND ("thumbnail" IS NULL OR "thumbnail" = '');
 
 
 -- =========================================
@@ -21,7 +20,6 @@ SELECT
   "highlight"
 FROM "news"
 WHERE "highlight" IS NOT NULL
-  AND "highlight" <> '';
 
 
 -- =========================================
