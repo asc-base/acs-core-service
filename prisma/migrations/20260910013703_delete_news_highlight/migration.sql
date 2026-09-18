@@ -1,4 +1,13 @@
 -- =========================================
+-- 0.delete creaeteby and updateBy
+-- =========================================
+
+ALTER TABLE "news_additional_images"
+DROP COLUMN "created_by",
+DROP COLUMN "updated_by",
+
+
+-- =========================================
 -- 1. image -> thumbnail
 -- =========================================
 
