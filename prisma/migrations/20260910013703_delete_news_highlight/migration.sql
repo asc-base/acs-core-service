@@ -2,9 +2,11 @@
 -- 1. image -> thumbnail
 -- =========================================
 
-UPDATE "news"
-SET "thumbnail" = "image"
-WHERE "image" IS NOT NULL
+ALTER TABLE "news"
+DROP COLUMN "thumbnail";
+
+ALTER TABLE "news"
+RENAME COLUMN "image" TO "thumbnail";
 
 
 -- =========================================
@@ -27,7 +29,6 @@ WHERE "highlight" IS NOT NULL
 -- =========================================
 
 ALTER TABLE "news"
-DROP COLUMN "image",
 DROP COLUMN "highlight",
 DROP COLUMN "card_focal_point_x",
 DROP COLUMN "card_focal_point_y";
