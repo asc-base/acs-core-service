@@ -11,11 +11,10 @@ DROP COLUMN "updated_by",
 -- 1. image -> thumbnail
 -- =========================================
 
-ALTER TABLE "news"
-DROP COLUMN "thumbnail";
-
-ALTER TABLE "news"
-RENAME COLUMN "image" TO "thumbnail";
+UPDATE "news"
+SET "thumbnail" = "image"
+WHERE "image" IS NOT NULL
+  AND ("thumbnail" IS NULL OR "thumbnail" = '');
 
 
 -- =========================================
@@ -31,6 +30,7 @@ SELECT
   "highlight"
 FROM "news"
 WHERE "highlight" IS NOT NULL
+  AND "highlight" <> '';
 
 
 -- =========================================
