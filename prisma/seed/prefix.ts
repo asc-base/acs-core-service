@@ -17,8 +17,15 @@ export const prefixes = [
 export const executeSeedPrefixes = async (prisma: PrismaClient) => {
   for (const prefix of prefixes) {
     await prisma.prefix.upsert({
-      where: { nameTh: prefix.nameTh },
-      update: {},
+      where: {
+        sequence: prefix.sequence,
+      },
+      update: {
+        nameTh: prefix.nameTh,
+        nameEn: prefix.nameEn,
+        shortNameTh: prefix.shortTh,
+        shortNameEn: prefix.shortEn,
+      },
       create: {
         sequence: prefix.sequence,
         nameTh: prefix.nameTh,
