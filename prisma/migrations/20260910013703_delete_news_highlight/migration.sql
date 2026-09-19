@@ -4,17 +4,18 @@
 
 ALTER TABLE "news_additional_images"
 DROP COLUMN "created_by",
-DROP COLUMN "updated_by",
+DROP COLUMN "updated_by";
 
 
 -- =========================================
 -- 1. image -> thumbnail
 -- =========================================
 
-UPDATE "news"
-SET "thumbnail" = "image"
-WHERE "image" IS NOT NULL
-  AND ("thumbnail" IS NULL OR "thumbnail" = '');
+ALTER TABLE "news"
+DROP COLUMN "thumbnail";
+
+ALTER TABLE "news"
+RENAME COLUMN "image" TO "thumbnail";
 
 
 -- =========================================
@@ -23,14 +24,17 @@ WHERE "image" IS NOT NULL
 
 INSERT INTO "news_additional_images" (
   "news_id",
-  "image_url"
+  "image_url",
+  "created_at",
+  "updated_at"
 )
 SELECT
   "id",
-  "highlight"
+  "highlight",
+  now(),
+  now()
 FROM "news"
-WHERE "highlight" IS NOT NULL
-  AND "highlight" <> '';
+WHERE "highlight" IS NOT NULL;
 
 
 -- =========================================
