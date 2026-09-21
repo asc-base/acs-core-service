@@ -331,7 +331,6 @@ model Prefix {
 model NewsFeatures {
   id           Int       @id @default(autoincrement()) @map("id")
   thumbnailURL String    @map("thumbnail_url")
-  highlightURL String?   @map("highlight_url")
   newsID       Int       @map("news_id")
   tagID        Int       @map("tag_id")
   createdAt    DateTime  @default(now()) @map("created_at")
@@ -341,6 +340,8 @@ model NewsFeatures {
   updatedBy    Int       @map("updated_by")
   news         News      @relation(fields: [newsID], references: [id])
   tag          Tag       @relation(fields: [tagID], references: [id])
+  thumbnailFocalPointX Float? @map("thumbnail_focal_point_x")
+  thumbnailFocalPointY Float? @map("thumbnail_focal_point_y")
 
   @@unique([newsID, tagID])
   @@map("news_features")
