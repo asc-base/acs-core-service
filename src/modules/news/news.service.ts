@@ -166,10 +166,9 @@ export class NewsService implements INewsService {
 
   async upsertNewsFeature(data: UpsertNewsFeatureDTO, userId: number): Promise<NewsFeatureDTO> {
     try {
-      const { thumbnail, highlight, id, ...rest } = data;
+      const { thumbnail, id, ...rest } = data;
 
       let thumbnailURL: string;
-      let highlightURL: string | undefined = undefined;
 
       if (typeof thumbnail === "string") {
         thumbnailURL = thumbnail;
@@ -188,19 +187,9 @@ export class NewsService implements INewsService {
         );
       }
 
-      if (typeof highlight === "string") {
-        highlightURL = highlight;
-      } else if (highlight) {
-        highlightURL = await this.storageService.uploadFile(
-          highlight,
-          "news-features",
-        );
-      }
-
       const newsFeatureData: NewsFeatureUpsertPayload = {
         ...rest,
         thumbnailURL,
-        highlightURL,
         createdBy: userId,
         updatedBy: userId,
       };
