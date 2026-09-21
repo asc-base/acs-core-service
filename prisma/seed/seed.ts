@@ -11,12 +11,14 @@ async function main() {
   await executeSeedPrefixes(prisma);
 }
 
-try {
-  await main();
-  console.log("Seeding completed.");
-} catch (e) {
-  console.error("Seeding failed:", e);
-  process.exit(1);
-} finally {
-  await prisma.$disconnect();
-}
+main()
+  .then(() => {
+    console.log("Seeding completed.");
+  })
+  .catch((e) => {
+    console.error("Seeding failed:", e);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
