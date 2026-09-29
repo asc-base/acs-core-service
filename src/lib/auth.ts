@@ -46,10 +46,8 @@ export const auth = betterAuth({
     },
   },
   user: {
-    fields: {
-      name: "firstNameTh",
-      image: "imageUrl",
-    },
+    // Prisma's AuthUser model maps to auth.users (not public.users).
+    modelName: "authUser",
   },
   session: {
     fields: {
@@ -69,4 +67,6 @@ export const auth = betterAuth({
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: createBetterAuthPasswordResetSender(),
   },
+  // Application profile changes go through public.users and its sync trigger.
+  disabledPaths: ["/update-user", "/delete-user"],
 });

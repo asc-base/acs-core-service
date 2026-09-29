@@ -1,0 +1,757 @@
+// =====================================================
+// USER / PROFILE
+// =====================================================
+
+// IDs follow the current Int-based API/database contract. UUID migration is deferred.
+Table public.users {
+  id int [pk, not null]
+
+  email text [not null, unique]
+
+  first_name_th text [not null]
+  last_name_th text [not null]
+
+  first_name_en text
+  last_name_en text
+
+  nick_name text
+
+  prefix_id int [ref: > prefixes.id]
+  image_id int [ref: > image_media.id]
+
+  // Legacy fields retained while media/profile migration is phased in.
+  email_verified boolean [not null, default: false]
+  image_url text
+  image_focal_point_x float
+  image_focal_point_y float
+  created_by int
+  updated_by int
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+}
+
+Table auth.users {
+  id int [pk, not null, ref: - public.users.id]
+  name text [not null]
+  email text [not null, unique]
+  email_verified boolean [not null, default: false]
+  image text
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+}
+
+Table auth.auth_sessions {
+  id int [pk, not null]
+  user_id int [not null, ref: > auth.users.id]
+  token text [not null, unique]
+  expires_at timestamp [not null]
+  ip_address text
+  user_agent text
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  indexes {
+    user_id
+  }
+}
+
+Table auth.auth_accounts {
+  id int [pk, not null]
+  user_id int [not null, ref: > auth.users.id]
+  account_id text [not null]
+  provider_id text [not null]
+  access_token text
+  refresh_token text
+  access_token_expires_at timestamp
+  refresh_token_expires_at timestamp
+  scope text
+  id_token text
+  password text
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  indexes {
+    (provider_id, account_id) [unique]
+    user_id
+  }
+}
+
+Table auth.auth_verifications {
+  id int [pk, not null]
+  identifier text [not null]
+  value text [not null]
+  expires_at timestamp [not null]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  indexes {
+    identifier
+  }
+}
+
+Table public.prefixes {
+  id int [pk, not null]
+
+  name_th text [not null]
+  name_en text [not null]
+
+  short_name_th text [not null]
+  short_name_en text [not null]
+  sequence int [not null, unique, default: 0, note: 'Legacy field']
+}
+
+
+// =====================================================
+// STUDENT / PROFESSOR
+// =====================================================
+
+Table public.students {
+  id int [pk, not null]
+
+  user_id int [ref: > users.id, not null]
+  class_book_id int [ref: > class_books.id]
+
+  student_code text [not null, unique]
+
+  linkedin text
+  github text
+  instagram text
+  facebook text
+  skills text [note: 'Legacy field']
+  classbook_id int [not null, ref: > public.class_books.id, note: 'Legacy field; retained beside class_book_id']
+  created_by int [not null]
+  updated_by int [not null]
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+
+  indexes {
+    user_id [unique]
+    class_book_id
+  }
+}
+
+Table public.professors {
+  id int [pk, not null]
+
+  user_id int [ref: > users.id, not null]
+
+  prof_room text [not null]
+  phone varchar(20) [not null]
+  expert_fields text [note: 'Legacy field']
+  educations text [note: 'Legacy field']
+  created_by int [not null]
+  updated_by int [not null]
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+
+  indexes {
+    user_id [unique]
+  }
+}
+
+
+// =====================================================
+// RBAC
+// =====================================================
+
+Table public.roles {
+  id int [pk, not null]
+
+  code text [not null, unique]
+  name text [not null]
+}
+
+Table public.permissions {
+  id int [pk, not null]
+
+  code text [not null, unique]
+  name text [not null]
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+}
+
+Table public.user_roles {
+  id int [pk, not null]
+
+  user_id int [ref: > users.id, not null]
+  role_id int [ref: > roles.id, not null]
+
+  created_by int [not null]
+  updated_by int [not null]
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+
+  indexes {
+    (user_id, role_id) [unique]
+  }
+}
+
+Table public.role_permissions {
+  id int [pk, not null]
+
+  role_id int [ref: > roles.id, not null]
+  permission_id int [ref: > permissions.id, not null]
+
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+  created_by int
+  updated_by int
+
+  indexes {
+    (role_id, permission_id) [unique]
+  }
+}
+
+
+// =====================================================
+// CENTRAL IMAGE MEDIA
+// =====================================================
+
+Table public.image_media {
+  id int [pk, not null]
+
+  file_key text [unique, note: 'Nullable for legacy URL-only images']
+  file_name text
+
+  image_url text
+
+  content_type varchar(100)
+
+  file_size bigint
+  width int
+  height int
+
+  focal_point_x float
+  focal_point_y float
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+}
+
+
+// =====================================================
+// NEWS
+// =====================================================
+
+Table public.news_categories {
+  id int [pk, not null]
+
+  code text [not null, unique]
+  name text [not null]
+}
+
+Table public.news {
+  id int [pk, not null]
+
+  title text [not null]
+  detail text [not null]
+
+  // Legacy fields retained until the news/media migration is complete.
+  thumbnail text
+  thumbnail_focal_point_x float
+  thumbnail_focal_point_y float
+  tag_id int [not null, ref: > public.tags.id]
+  start_date timestamp [not null]
+  due_date timestamp
+  created_by int [not null]
+  updated_by int [not null]
+
+  news_category_id int [ref: > news_categories.id]
+
+  event_start_at timestamp
+  event_end_at timestamp
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+
+  indexes {
+    news_category_id
+    event_start_at
+  }
+}
+
+Table public.news_images {
+  id int [pk, not null]
+
+  news_id int [ref: > news.id, not null]
+  image_id int [ref: > image_media.id, not null]
+
+  image_type news_image_type [not null]
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+
+  indexes {
+    news_id
+    image_id
+  }
+}
+
+Table public.news_bulletins {
+  id int [pk, not null]
+
+  news_id int [ref: > news.id, not null]
+
+  type news_bulletin_type [not null]
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+
+  indexes {
+    (news_id, type) [unique]
+  }
+}
+
+
+// =====================================================
+// CURRICULUM
+// =====================================================
+
+Table public.curriculums {
+  id int [pk, not null]
+
+  title text [not null]
+  year text [not null, note: 'Current type; numeric conversion is deferred']
+
+  description text [not null]
+  document_url text [not null]
+  thumbnail_url text [not null, note: 'Legacy field']
+  thumbnail_focal_point_x float
+  thumbnail_focal_point_y float
+
+  image_id int [ref: > image_media.id]
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+  created_by int [not null]
+  updated_by int [not null]
+
+  indexes {
+    year
+  }
+}
+
+
+// =====================================================
+// CLASS BOOK / STUDENT COHORT
+// =====================================================
+
+Table public.class_books {
+  id int [pk, not null]
+
+  class_of text [not null]
+  classof text [not null, unique, note: 'Legacy field']
+  thumbnail_url text [not null, note: 'Legacy field']
+  image_focal_point_x float
+  image_focal_point_y float
+
+  curriculum_id int [ref: > curriculums.id, not null]
+
+  first_year_academic text [not null, note: 'Current type; numeric conversion is deferred']
+  last_year_academic int
+
+  image_id int [ref: > image_media.id]
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+  created_by int [not null]
+  updated_by int [not null]
+
+  indexes {
+    curriculum_id
+    first_year_academic
+  }
+}
+
+
+// =====================================================
+// COURSE
+// =====================================================
+
+Table public.course_types {
+  id int [pk, not null]
+
+  code text [not null, unique]
+  name text [not null]
+}
+
+Table public.courses {
+  id int [pk, not null]
+
+  course_code text [not null]
+
+  course_name_th text [not null]
+  course_name_en text [not null]
+
+  detail text [not null]
+
+  course_type_id int [ref: > course_types.id]
+  type_course_id int [not null, ref: > public.type_courses.id, note: 'Legacy field']
+  credits text [not null, note: 'Legacy field']
+  curriculum_id int [ref: > curriculums.id, not null]
+
+  created_by int [not null]
+  updated_by int [not null]
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+
+  indexes {
+    curriculum_id
+    course_type_id
+
+    (curriculum_id, course_code) [unique]
+  }
+}
+
+
+// =====================================================
+// COURSE PREREQUISITE
+// =====================================================
+
+Table public.prerequisites {
+  id int [pk, not null]
+
+  course_id int [ref: > courses.id, not null]
+  prerequisite_course_id int [ref: > courses.id, not null]
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+
+  indexes {
+    course_id
+    prerequisite_course_id
+
+    (course_id, prerequisite_course_id) [unique]
+  }
+}
+
+
+// =====================================================
+// PROJECT
+// =====================================================
+
+Table public.projects {
+  id int [pk, not null]
+
+  title text [not null]
+  detail text
+
+  // Legacy denormalized fields retained during project migration.
+  thumbnail_url text [not null]
+  thumbnail_focal_point_x float
+  thumbnail_focal_point_y float
+  tech_stacks text [not null]
+  details text [not null]
+  created_by int [not null]
+  updated_by int [not null]
+
+  presentation_url text [not null, note: 'Legacy field']
+  document_url text [not null, note: 'Legacy field']
+  figma_url text
+  youtube_url text [not null, note: 'Legacy field']
+  github_url text [not null, note: 'Legacy field']
+  assets_url text [not null, note: 'Legacy field']
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+}
+
+
+// =====================================================
+// PROJECT MEMBERS
+//
+// user_id points to users because project members can be:
+// - Student
+// - Advisor
+// - Co-advisor
+// =====================================================
+
+Table public.project_members {
+  id int [pk, not null]
+
+  project_id int [ref: > projects.id, not null]
+  user_id int [ref: > users.id, not null]
+
+  member_type project_member_type [not null]
+  role_id int [not null, ref: > public.roles.id, note: 'Legacy field']
+  created_by int [not null]
+  updated_by int [not null]
+
+  // Optional responsibility inside the project
+  // e.g. Backend Developer, Frontend Developer, UX/UI
+  position text
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+
+  indexes {
+    project_id
+    user_id
+
+    (project_id, user_id) [unique]
+  }
+}
+
+
+// =====================================================
+// PROJECT CATEGORY
+// =====================================================
+
+Table public.categories {
+  id int [pk, not null]
+
+  name text [not null, unique]
+}
+
+Table public.project_categories {
+  id int [pk, not null]
+
+  project_id int [ref: > projects.id, not null]
+  category_id int [ref: > categories.id, not null]
+
+  indexes {
+    project_id
+    category_id
+
+    (project_id, category_id) [unique]
+  }
+}
+
+
+// =====================================================
+// PROJECT TYPE
+// =====================================================
+
+Table public.project_types {
+  id int [pk, not null]
+
+  name text [not null, unique]
+}
+
+Table public.project_project_types {
+  id int [pk, not null]
+
+  project_id int [ref: > projects.id, not null]
+  type_id int [ref: > project_types.id, not null]
+
+  indexes {
+    project_id
+    type_id
+
+    (project_id, type_id) [unique]
+  }
+}
+
+
+// =====================================================
+// PROJECT FIELD
+// =====================================================
+
+Table public.fields {
+  id int [pk, not null]
+
+  name text [not null, unique]
+}
+
+Table public.project_fields {
+  id int [pk, not null]
+
+  project_id int [ref: > projects.id, not null]
+  field_id int [ref: > fields.id, not null]
+
+  indexes {
+    project_id
+    field_id
+
+    (project_id, field_id) [unique]
+  }
+}
+
+
+// =====================================================
+// TECH STACK
+// =====================================================
+
+Table public.tech_stacks {
+  id int [pk, not null]
+
+  name text [not null, unique]
+}
+
+Table public.project_tech_stacks {
+  id int [pk, not null]
+
+  project_id int [ref: > projects.id, not null]
+  tech_stack_id int [ref: > tech_stacks.id, not null]
+
+  indexes {
+    project_id
+    tech_stack_id
+
+    (project_id, tech_stack_id) [unique]
+  }
+}
+
+
+// =====================================================
+// PROJECT IMAGE
+// =====================================================
+
+Table public.project_images {
+  id int [pk, not null]
+
+  project_id int [ref: > projects.id, not null]
+  image_id int [ref: > image_media.id, not null]
+
+  image_type project_image_type [not null]
+
+  created_at timestamp [not null]
+  updated_at timestamp
+  deleted_at timestamp
+
+  indexes {
+    project_id
+    image_id
+  }
+}
+
+
+// Existing tables retained until their replacement data and callers are migrated.
+Table public.tag_groups {
+  id int [pk, not null]
+  name text [not null, unique]
+}
+
+Table public.tags {
+  id int [pk, not null]
+  name text [not null, unique]
+  tage_groups_id int [ref: > public.tag_groups.id, not null]
+}
+
+Table public.news_features {
+  id int [pk, not null]
+  thumbnail_url text [not null]
+  news_id int [ref: > public.news.id, not null]
+  tag_id int [ref: > public.tags.id, not null]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  deleted_at timestamp
+  created_by int [not null]
+  updated_by int [not null]
+  thumbnail_focal_point_x float
+  thumbnail_focal_point_y float
+
+  indexes {
+    (news_id, tag_id) [unique]
+  }
+}
+
+Table public.news_additional_images {
+  id int [pk, not null]
+  news_id int [ref: > public.news.id, not null]
+  image_url text [not null]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  deleted_at timestamp
+}
+
+Table public.type_courses {
+  id int [pk, not null]
+  name text [not null, unique]
+  description text [not null]
+}
+
+Table public.pre_courses {
+  id int [pk, not null]
+  course_id int [ref: > public.courses.id, not null]
+  pre_course_id int [ref: > public.courses.id, not null]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  deleted_at timestamp
+  created_by int [not null]
+  updated_by int [not null]
+
+  indexes {
+    (course_id, pre_course_id) [unique]
+  }
+}
+
+Table public.project_tags {
+  id int [pk, not null]
+  project_id int [ref: > public.projects.id, not null]
+  tag_id int [ref: > public.tags.id, not null]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  deleted_at timestamp
+  created_by int [not null]
+  updated_by int [not null]
+
+  indexes {
+    (project_id, tag_id) [unique]
+  }
+}
+
+Table public.project_courses {
+  id int [pk, not null]
+  project_id int [ref: > public.projects.id, not null]
+  course_id int [ref: > public.courses.id, not null]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  deleted_at timestamp
+  created_by int [not null]
+  updated_by int [not null]
+
+  indexes {
+    (project_id, course_id) [unique]
+  }
+}
+
+
+// =====================================================
+// ENUMS
+// =====================================================
+
+Enum public.project_member_type {
+  STUDENT
+  ADVISOR
+  CO_ADVISOR
+}
+
+Enum public.project_image_type {
+  CARD
+  THUMBNAIL
+  DETAIL
+}
+
+Enum public.news_image_type {
+  CARD
+  THUMBNAIL
+  DETAIL
+}
+
+Enum public.news_bulletin_type {
+  HIGHLIGHT
+  ANNOUNCEMENT
+}

@@ -12,6 +12,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["public", "auth"]
 }
 
 model Role {
@@ -21,6 +22,7 @@ model Role {
   projectMembers ProjectMember[]
 
   @@map("roles")
+  @@schema("public")
 }
 
 model UserRole {
@@ -37,6 +39,7 @@ model UserRole {
 
   @@unique([userID, roleID])
   @@map("user_roles")
+  @@schema("public")
 }
 
 model User {
@@ -63,10 +66,28 @@ model User {
   student        Student?
   professor      Professor?
   projectMembers ProjectMember[]
+  authUser       AuthUser?
+
+  @@map("users")
+  @@schema("public")
+}
+
+// Better Auth identity is kept separate from the application profile. Its ID
+// is also the public.users ID so existing session and API identifiers survive.
+model AuthUser {
+  id             Int       @id @map("id")
+  name           String    @map("name")
+  email          String    @unique @map("email")
+  emailVerified  Boolean   @default(false) @map("email_verified")
+  image          String?   @map("image")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  applicationUser User     @relation(fields: [id], references: [id], onDelete: Cascade)
   sessions       Session[]
   accounts       Account[]
 
   @@map("users")
+  @@schema("auth")
 }
 
 // Better Auth keeps credentials, sessions and verification tokens separate
@@ -80,10 +101,11 @@ model Session {
   userAgent String?   @map("user_agent")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
-  user      User      @relation(fields: [userID], references: [id], onDelete: Cascade)
+  user      AuthUser  @relation(fields: [userID], references: [id], onDelete: Cascade)
 
   @@index([userID])
   @@map("auth_sessions")
+  @@schema("auth")
 }
 
 model Account {
@@ -100,11 +122,12 @@ model Account {
   password              String?   @map("password")
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
-  user                  User      @relation(fields: [userID], references: [id], onDelete: Cascade)
+  user                  AuthUser  @relation(fields: [userID], references: [id], onDelete: Cascade)
 
   @@unique([providerId, accountId])
   @@index([userID])
   @@map("auth_accounts")
+  @@schema("auth")
 }
 
 model Verification {
@@ -117,6 +140,7 @@ model Verification {
 
   @@index([identifier])
   @@map("auth_verifications")
+  @@schema("auth")
 }
 
 model TageGroups {
@@ -125,6 +149,7 @@ model TageGroups {
   tags Tag[]
 
   @@map("tag_groups")
+  @@schema("public")
 }
 
 model Tag {
@@ -137,6 +162,7 @@ model Tag {
   projectTags  ProjectTag[]
 
   @@map("tags")
+  @@schema("public")
 }
 
 model News {
@@ -159,6 +185,7 @@ model News {
   newsAdditionalImages NewsAdditionalImage[]
 
   @@map("news")
+  @@schema("public")
 }
 
 model NewsAdditionalImage {
@@ -171,6 +198,7 @@ model NewsAdditionalImage {
   news          News      @relation(fields: [newsID], references: [id])
 
   @@map("news_additional_images")
+  @@schema("public")
 }
 
 model Student {
@@ -192,6 +220,7 @@ model Student {
   classBook   ClassBook @relation(fields: [classBookID], references: [id])
 
   @@map("students")
+  @@schema("public")
 }
 
 model Curriculum {
@@ -212,6 +241,7 @@ model Curriculum {
   classBooks   ClassBook[]
 
   @@map("curriculums")
+  @@schema("public")
 }
 
 model Professor {
@@ -230,6 +260,7 @@ model Professor {
   user User @relation(fields: [userID], references: [id])
 
   @@map("professors")
+  @@schema("public")
 }
 
 model TypeCourse {
@@ -239,6 +270,7 @@ model TypeCourse {
   courses     Course[]
 
   @@map("type_courses")
+  @@schema("public")
 }
 
 model Course {
@@ -262,6 +294,7 @@ model Course {
   projectCourses ProjectCourse[]
 
   @@map("courses")
+  @@schema("public")
 }
 
 model PreCourse {
@@ -280,6 +313,7 @@ model PreCourse {
   @@unique([courseID, preCourseID])
 
   @@map("pre_courses")
+  @@schema("public")
 }
 
 
@@ -300,6 +334,7 @@ model ClassBook {
   students          Student[]
 
   @@map("class_books")
+  @@schema("public")
 }
 
 // model Education {
@@ -326,6 +361,7 @@ model Prefix {
   users       User[]
 
   @@map("prefixes")
+  @@schema("public")
 }
 
 model NewsFeatures {
@@ -345,6 +381,7 @@ model NewsFeatures {
 
   @@unique([newsID, tagID])
   @@map("news_features")
+  @@schema("public")
 }
 
 model Project {
@@ -371,6 +408,7 @@ model Project {
   projectCourses  ProjectCourse[]
 
   @@map("projects")
+  @@schema("public")
 }
 
 model ProjectTag {
@@ -388,6 +426,7 @@ model ProjectTag {
 
   @@unique([projectID, tagID])
   @@map("project_tags")
+  @@schema("public")
 }
 
 model ProjectMember {
@@ -407,6 +446,7 @@ model ProjectMember {
 
   @@unique([projectID, userID])
   @@map("project_members")
+  @@schema("public")
 }
 
 model ProjectCourse {
@@ -424,4 +464,5 @@ model ProjectCourse {
 
   @@unique([projectID, courseID])
   @@map("project_courses")
+  @@schema("public")
 }
