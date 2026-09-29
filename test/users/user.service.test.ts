@@ -54,15 +54,11 @@ describe("UserService.createSuperUser", () => {
       lastNameEn: "Administrator",
       email: "admin@example.com",
       nickName: "admin",
-      createdBy: 0,
-      updatedBy: 0,
     });
     expect(createdUser).not.toHaveProperty("password");
     expect(assignedRole).toEqual({
       userID: user.id,
       roleID: 1,
-      createdBy: 0,
-      updatedBy: 0,
     });
     expect(credential?.userID).toBe(user.id);
     expect(
@@ -73,6 +69,7 @@ describe("UserService.createSuperUser", () => {
     ).toBe(true);
     expect(result).toEqual({
       id: user.id,
+      prefix: null,
       firstNameTh: user.firstNameTh,
       lastNameTh: user.lastNameTh,
       firstNameEn: user.firstNameEn,
@@ -80,6 +77,8 @@ describe("UserService.createSuperUser", () => {
       email: user.email,
       nickName: user.nickName,
       imageUrl: user.imageUrl,
+      imageFocalPointX: null,
+      imageFocalPointY: null,
     });
   });
 });
@@ -98,14 +97,10 @@ describe("UserService.getUserProfile", () => {
             name: "SUPER_ADMIN",
             createdAt: new Date("2026-08-01T00:00:00.000Z"),
             updatedAt: new Date("2026-08-01T00:00:00.000Z"),
-            createdBy: 0,
-            updatedBy: 0,
             deletedAt: null,
           },
           createdAt: new Date("2026-08-01T00:00:00.000Z"),
           updatedAt: new Date("2026-08-01T00:00:00.000Z"),
-          createdBy: 0,
-          updatedBy: 0,
           deletedAt: null,
         },
       ],
@@ -129,6 +124,7 @@ describe("UserService.getUserProfile", () => {
 
     await expect(service.getUserProfile(user.id)).resolves.toEqual({
       id: user.id,
+      prefix: null,
       firstNameTh: user.firstNameTh,
       lastNameTh: user.lastNameTh,
       firstNameEn: user.firstNameEn,
@@ -136,6 +132,8 @@ describe("UserService.getUserProfile", () => {
       email: user.email,
       nickName: user.nickName,
       imageUrl: user.imageUrl,
+      imageFocalPointX: null,
+      imageFocalPointY: null,
       roles: [{ id: 1, name: "SUPER_ADMIN" }],
     });
   });
@@ -165,8 +163,6 @@ const createUser = (): User => {
     imageUrl: null,
     createdAt: now,
     updatedAt: now,
-    createdBy: 0,
-    updatedBy: 0,
     deletedAt: null,
   };
 };

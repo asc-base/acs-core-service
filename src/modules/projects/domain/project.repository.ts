@@ -40,5 +40,5 @@ export interface IProjectRepository {
     id: number,
     projectData: ProjectUpdatePayload,
   ): Promise<Project>;
-  deleteProject(id: number, userId: number): Promise<Project>;
+  deleteProject(id: number): Promise<Project>;
 }

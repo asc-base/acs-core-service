@@ -97,8 +97,6 @@ export const ProfessorCreatePayloadSchema = t.Object({
   expertFields: t.Optional(t.Nullable(t.String())),
   educations: t.Optional(t.Nullable(t.String())),
   userID: t.Number(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const ProfessorUpdatePayloadSchema = t.Partial(
@@ -107,7 +105,6 @@ export const ProfessorUpdatePayloadSchema = t.Partial(
     profRoom: t.String(),
     expertFields: t.Optional(t.Nullable(t.String())),
     educations: t.Optional(t.Nullable(t.String())),
-    updatedBy: t.Number(),
     deletedAt: t.Optional(t.Nullable(t.Date())),
   }),
 );

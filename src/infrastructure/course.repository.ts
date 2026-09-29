@@ -27,8 +27,6 @@ export class CourseRepository implements ICourseRepository {
             ? {
                 create: preCourseID.map((id) => ({
                   preCourseID: id,
-                  createdBy: 0,
-                  updatedBy: 0,
                 })),
               }
             : undefined,
@@ -194,8 +192,6 @@ export class CourseRepository implements ICourseRepository {
             ...(newPrecourseId.length && {
               create: newPrecourseId.map((id) => ({
                 preCourseID: id,
-                createdBy: 0,
-                updatedBy: 0,
               })),
             }),
 
@@ -227,13 +223,12 @@ export class CourseRepository implements ICourseRepository {
     }
   }
 
-  async deleteCourse(courseId: number, updatedBy: number): Promise<Course> {
+  async deleteCourse(courseId: number): Promise<Course> {
     try {
       const course = await this.db.course.update({
         where: { id: courseId },
         data: {
           deletedAt: new Date(),
-          updatedBy: updatedBy,
         },
         include: {
           typeCourse: true,

@@ -24,8 +24,6 @@ Table public.users {
   image_url text
   image_focal_point_x float
   image_focal_point_y float
-  created_by int
-  updated_by int
 
   created_at timestamp [not null]
   updated_at timestamp
@@ -121,8 +119,6 @@ Table public.students {
   facebook text
   skills text [note: 'Legacy field']
   classbook_id int [not null, ref: > public.class_books.id, note: 'Legacy field; retained beside class_book_id']
-  created_by int [not null]
-  updated_by int [not null]
 
   created_at timestamp [not null]
   updated_at timestamp
@@ -143,8 +139,6 @@ Table public.professors {
   phone varchar(20) [not null]
   expert_fields text [note: 'Legacy field']
   educations text [note: 'Legacy field']
-  created_by int [not null]
-  updated_by int [not null]
 
   created_at timestamp [not null]
   updated_at timestamp
@@ -184,9 +178,6 @@ Table public.user_roles {
   user_id int [ref: > users.id, not null]
   role_id int [ref: > roles.id, not null]
 
-  created_by int [not null]
-  updated_by int [not null]
-
   created_at timestamp [not null]
   updated_at timestamp
   deleted_at timestamp
@@ -205,8 +196,6 @@ Table public.role_permissions {
   created_at timestamp
   updated_at timestamp
   deleted_at timestamp
-  created_by int
-  updated_by int
 
   indexes {
     (role_id, permission_id) [unique]
@@ -265,8 +254,6 @@ Table public.news {
   tag_id int [not null, ref: > public.tags.id]
   start_date timestamp [not null]
   due_date timestamp
-  created_by int [not null]
-  updated_by int [not null]
 
   news_category_id int [ref: > news_categories.id]
 
@@ -339,8 +326,6 @@ Table public.curriculums {
   created_at timestamp [not null]
   updated_at timestamp
   deleted_at timestamp
-  created_by int [not null]
-  updated_by int [not null]
 
   indexes {
     year
@@ -371,8 +356,6 @@ Table public.class_books {
   created_at timestamp [not null]
   updated_at timestamp
   deleted_at timestamp
-  created_by int [not null]
-  updated_by int [not null]
 
   indexes {
     curriculum_id
@@ -406,9 +389,6 @@ Table public.courses {
   type_course_id int [not null, ref: > public.type_courses.id, note: 'Legacy field']
   credits text [not null, note: 'Legacy field']
   curriculum_id int [ref: > curriculums.id, not null]
-
-  created_by int [not null]
-  updated_by int [not null]
 
   created_at timestamp [not null]
   updated_at timestamp
@@ -462,8 +442,6 @@ Table public.projects {
   thumbnail_focal_point_y float
   tech_stacks text [not null]
   details text [not null]
-  created_by int [not null]
-  updated_by int [not null]
 
   presentation_url text [not null, note: 'Legacy field']
   document_url text [not null, note: 'Legacy field']
@@ -495,8 +473,6 @@ Table public.project_members {
 
   member_type project_member_type [not null]
   role_id int [not null, ref: > public.roles.id, note: 'Legacy field']
-  created_by int [not null]
-  updated_by int [not null]
 
   // Optional responsibility inside the project
   // e.g. Backend Developer, Frontend Developer, UX/UI
@@ -658,8 +634,6 @@ Table public.news_features {
   created_at timestamp [not null]
   updated_at timestamp [not null]
   deleted_at timestamp
-  created_by int [not null]
-  updated_by int [not null]
   thumbnail_focal_point_x float
   thumbnail_focal_point_y float
 
@@ -690,8 +664,6 @@ Table public.pre_courses {
   created_at timestamp [not null]
   updated_at timestamp [not null]
   deleted_at timestamp
-  created_by int [not null]
-  updated_by int [not null]
 
   indexes {
     (course_id, pre_course_id) [unique]
@@ -705,8 +677,6 @@ Table public.project_tags {
   created_at timestamp [not null]
   updated_at timestamp [not null]
   deleted_at timestamp
-  created_by int [not null]
-  updated_by int [not null]
 
   indexes {
     (project_id, tag_id) [unique]
@@ -720,8 +690,6 @@ Table public.project_courses {
   created_at timestamp [not null]
   updated_at timestamp [not null]
   deleted_at timestamp
-  created_by int [not null]
-  updated_by int [not null]
 
   indexes {
     (project_id, course_id) [unique]

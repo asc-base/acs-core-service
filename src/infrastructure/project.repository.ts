@@ -247,11 +247,10 @@ export class ProjectRepository implements IProjectRepository {
     return updatedProject as unknown as Project;
   }
 
-  async deleteProject(id: number, userID: number): Promise<Project> {
+  async deleteProject(id: number): Promise<Project> {
     const deletedProject = await this.db.project.update({
       where: { id, deletedAt: null },
       data: {
-        updatedBy: userID || 0,
         deletedAt: new Date()
       },
     });

@@ -14,12 +14,12 @@ import { ErrorCode } from "../../core/types/errors";
 import { PageableType } from "../../core/models";
 
 interface IClassBookService {
-  createClassBook(data: CreateClassBookDTO, createdBy: number): Promise<ClassBookDTO>;
+  createClassBook(data: CreateClassBookDTO): Promise<ClassBookDTO>;
   getClassBooks(
     query: ClassBookQueryParams,
   ): Promise<PageableType<typeof ClassBookDTO>>;
   getClassBookById(id: number): Promise<ClassBookDTO | null>;
-  updateClassBook(classBookID: number, data: UpdateClassBookDTO, userID: number): Promise<ClassBookDTO>;
+  updateClassBook(classBookID: number, data: UpdateClassBookDTO): Promise<ClassBookDTO>;
   deleteClassBook(id: number): Promise<ClassBookDTO>;
 }
 
@@ -30,7 +30,7 @@ export class ClassBookService implements IClassBookService {
     private readonly storage: SupabaseService,
   ) { }
 
-  async createClassBook(data: CreateClassBookDTO, createdBy: number): Promise<ClassBookDTO> {
+  async createClassBook(data: CreateClassBookDTO): Promise<ClassBookDTO> {
     const { thumbnailFile, ...rest } = data;
     try {
       let thumbnailPath: string | null = null;
@@ -50,8 +50,6 @@ export class ClassBookService implements IClassBookService {
       const classBookData = {
         ...rest,
         thumbnailURL: thumbnailPath,
-        createdBy: createdBy || 0,
-        updatedBy: createdBy || 0,
       };
 
       const classBook =
@@ -86,7 +84,7 @@ export class ClassBookService implements IClassBookService {
     }
     return this.classBookFactory.mapClassBookToDTO(classBook);
   }
-  async updateClassBook(classBookID: number, data: UpdateClassBookDTO, userID: number): Promise<ClassBookDTO> {
+  async updateClassBook(classBookID: number, data: UpdateClassBookDTO): Promise<ClassBookDTO> {
     const {
       thumbnailFile,
       classof,
@@ -109,7 +107,6 @@ export class ClassBookService implements IClassBookService {
         classof,
         firstYearAcademic,
         curriculumID,
-        updatedBy: userID,
         imageFocalPointX,
         imageFocalPointY,
       };

@@ -22,12 +22,11 @@ import { NewsFactory } from "./news.factory";
 import { PageableType } from "../../core/models";
 
 interface INewsService {
-  createNews(data: CreateNewsDTO, userId: number, additionalImageUrls?: string[]): Promise<NewsDTO>;
+  createNews(data: CreateNewsDTO): Promise<NewsDTO>;
   getNews(query: NewsQueryParams): Promise<PageableType<typeof NewsDTO>>;
   getNewsById(id: number): Promise<NewsWithAdditionalImageDTO | null>;
   upsertNewsFeature(
     data: UpsertNewsFeatureDTO,
-    userId: number,
   ): Promise<NewsFeatureDTO>;
   getNewsFeatures(
     query: QueryNewsFeatureParams,
@@ -43,7 +42,6 @@ export class NewsService implements INewsService {
   ) { }
   async createNews(
     data: CreateNewsDTO,
-    userId: number,
   ): Promise<NewsDTO> {
         const {
       thumbnail,
@@ -85,8 +83,6 @@ export class NewsService implements INewsService {
       const newsData: NewsCreatePayload = {
         ...newsFields,
         thumbnail: uploadedThumbnailPath,
-        createdBy: userId,
-        updatedBy: userId,
       };
 
       const news = await this.newsRepository.createNews(newsData);
@@ -99,8 +95,6 @@ export class NewsService implements INewsService {
           uploadedAdditionalImages.map((imageUrl) => ({
             newsID: news.id,
             imageUrl,
-            createdBy: userId,
-            updatedBy: userId,
           }));
 
         newsAdditionalImages =
@@ -164,7 +158,7 @@ export class NewsService implements INewsService {
     }
   }
 
-  async upsertNewsFeature(data: UpsertNewsFeatureDTO, userId: number): Promise<NewsFeatureDTO> {
+  async upsertNewsFeature(data: UpsertNewsFeatureDTO): Promise<NewsFeatureDTO> {
     try {
       const { thumbnail, id, ...rest } = data;
 
@@ -190,8 +184,6 @@ export class NewsService implements INewsService {
       const newsFeatureData: NewsFeatureUpsertPayload = {
         ...rest,
         thumbnailURL,
-        createdBy: userId,
-        updatedBy: userId,
       };
 
       if (!id) {
@@ -264,10 +256,9 @@ export class NewsService implements INewsService {
     return this.newsFactory.mapNewsToDTO(news);
   }
 
-  async updateNews(
+async updateNews(
   newsID: number,
   data: NewsUpdateDTO,
-  userID: number,
 ): Promise<NewsWithAdditionalImageDTO> {
   const {
     thumbnail,
@@ -303,7 +294,6 @@ export class NewsService implements INewsService {
       ...(thumbnailPath && {
         thumbnail: thumbnailPath,
       }),
-      updatedBy: userID,
       updatedAt: new Date(),
     };
 
@@ -327,8 +317,6 @@ export class NewsService implements INewsService {
         uploadedAdditionalImages.map((imageUrl) => ({
           newsID: news.id,
           imageUrl,
-          createdBy: userID,
-          updatedBy: userID,
         }));
 
       newsAdditionalImages =

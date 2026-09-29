@@ -21,7 +21,6 @@ import { PageableType } from "../../core/models";
 interface IProfessorService {
   createProfessor(
     data: CreateProfessorDTO,
-    userID: number,
   ): Promise<ProfessorDTO>;
   getProfessors(
     query: ProfessorQueryParams,
@@ -43,7 +42,6 @@ export class ProfessorService implements IProfessorService {
 
   async createProfessor(
     data: CreateProfessorDTO,
-    userID: number,
   ): Promise<ProfessorDTO> {
     const {
       imageFile,
@@ -82,7 +80,6 @@ export class ProfessorService implements IProfessorService {
             ...rawProfessorData,
             expertFields: rawProfessorData.expertFields,
             educations: rawProfessorData.educations,
-            updatedBy: userID,
             deletedAt: null,
           };
 
@@ -100,7 +97,6 @@ export class ProfessorService implements IProfessorService {
             lastNameEn,
             imageFocalPointX,
             imageFocalPointY,
-            updatedBy: userID,
             ...(pathImage && { imageUrl: pathImage }),
           };
 
@@ -118,8 +114,6 @@ export class ProfessorService implements IProfessorService {
             expertFields: rawProfessorData.expertFields,
             educations: rawProfessorData.educations,
             userID: existingUser.id,
-            createdBy: userID,
-            updatedBy: userID,
           };
 
           const newProfessor =
@@ -133,8 +127,6 @@ export class ProfessorService implements IProfessorService {
             await this.userRepository.assignUserRole({
               userID: existingUser.id,
               roleID: 3,
-              createdBy: userID,
-              updatedBy: userID,
             });
           }
 
@@ -146,7 +138,6 @@ export class ProfessorService implements IProfessorService {
             lastNameEn,
             imageFocalPointX,
             imageFocalPointY,
-            updatedBy: userID,
             ...(pathImage && { imageUrl: pathImage }),
           };
 
@@ -171,8 +162,6 @@ export class ProfessorService implements IProfessorService {
         imageUrl: pathImage,
         imageFocalPointX,
         imageFocalPointY,
-        createdBy: userID,
-        updatedBy: userID,
       };
 
       const user = await this.userRepository.createUser(userData);
@@ -188,8 +177,6 @@ export class ProfessorService implements IProfessorService {
       const role = await this.userRepository.assignUserRole({
         userID: user.id,
         roleID: 3,
-        createdBy: userID,
-        updatedBy: userID,
       });
 
       if (!role) {
@@ -204,8 +191,6 @@ export class ProfessorService implements IProfessorService {
         expertFields: rawProfessorData.expertFields,
         educations: rawProfessorData.educations,
         userID: user.id,
-        createdBy: userID,
-        updatedBy: userID,
       };
 
       const professor =
@@ -275,7 +260,6 @@ export class ProfessorService implements IProfessorService {
         profRoom,
         educations,
         expertFields,
-        updatedBy: 0,
       };
 
       professor = await this.professorRepository.updateProfessor(
@@ -290,7 +274,6 @@ export class ProfessorService implements IProfessorService {
       const updatedUserData: UpdateUserModel = {
         ...UserData,
         ...(pathImage && { imageUrl: pathImage }),
-        updatedBy: 0,
       };
 
       const user = await this.userRepository.updateUser(

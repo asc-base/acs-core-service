@@ -14,12 +14,12 @@ import { HttpStatusCode } from "../../core/types/http";
 import { ICurriculumFactory } from "./curriculum.factory";
 import { PageableType } from "../../core/models";
 interface ICurriculumService {
-  createCurriculum(data: CreateCurriculumDTO, userId: number): Promise<CurriculumDTO>;
+  createCurriculum(data: CreateCurriculumDTO): Promise<CurriculumDTO>;
   getCurriculums(
     query: CurriculumQueryParams,
   ): Promise<PageableType<typeof CurriculumDTO>>;
   getCurriculumById(id: number): Promise<CurriculumDTO>;
-  updateCurriculum(id: number, data: UpdateCurriculumDTO, userId: number): Promise<CurriculumDTO>;
+  updateCurriculum(id: number, data: UpdateCurriculumDTO): Promise<CurriculumDTO>;
   deleteCurriculum(id: number): Promise<CurriculumDTO>;
 }
 
@@ -30,7 +30,7 @@ export class CurriculumService implements ICurriculumService {
     private readonly storageService: SupabaseService,
   ) {}
 
-  async createCurriculum(data: CreateCurriculumDTO, userId: number): Promise<CurriculumDTO> {
+  async createCurriculum(data: CreateCurriculumDTO): Promise<CurriculumDTO> {
     const { thumbnailFile, ...rest } = data;
     try {
       let uploadedThumbnailPath: string | null = null;
@@ -50,8 +50,6 @@ export class CurriculumService implements ICurriculumService {
       const curriculumData: CurriculumCreatePayload = {
         ...rest,
         thumbnailURL: uploadedThumbnailPath,
-        createdBy: userId,
-        updatedBy: userId,
       };
 
       const curriculum =
@@ -97,7 +95,6 @@ export class CurriculumService implements ICurriculumService {
   async updateCurriculum(
     id: number,
     data: UpdateCurriculumDTO,
-    userId: number
   ): Promise<CurriculumDTO> {
     const existingCurriculum = await this.curriculumRepository.getCurriculumById(id);
     
@@ -137,7 +134,6 @@ export class CurriculumService implements ICurriculumService {
       const updatedData: CurriculumUpdatePayload = {
         ...rest,
         thumbnailURL: updatedThumbnailPath,
-        updatedBy: userId, 
       };
 
       const updatedCurriculum = await this.curriculumRepository.updateCurriculum(id, updatedData);

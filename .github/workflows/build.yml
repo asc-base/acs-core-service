@@ -46,6 +46,7 @@ jobs:
               uses: docker/build-push-action@v5
               with:
                   context: .
+                  target: production
                   push: true # เปลี่ยนเป็น true เมื่อพร้อมจะ Push ขึ้น ghcr.io
                   #   load: true
                   tags: ${{ steps.meta.outputs.tags }}

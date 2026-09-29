@@ -32,8 +32,8 @@ export const ProjectController = (app: Elysia) =>
     .use(roleMacro)
   .post(
       "",
-      async ({ body, projectService ,userID }) => {
-        const project = await projectService.createProject(userID,body);
+      async ({ body, projectService }) => {
+        const project = await projectService.createProject(body);
         return success(project);
       },
       {
@@ -43,8 +43,8 @@ export const ProjectController = (app: Elysia) =>
     )
   .put(
     "/:id",
-    async ({ body, params, projectService, userID, set }) => {
-        const updatedProject = await projectService.updateProject(params.id, userID, body);
+    async ({ body, params, projectService, set }) => {
+        const updatedProject = await projectService.updateProject(params.id, body);
         set.status = HttpStatusCode.OK;
         return success(updatedProject, "Project updated successfully");
     },
@@ -55,8 +55,8 @@ export const ProjectController = (app: Elysia) =>
   )
    .delete(
     "/:id",
-    async ({ params, projectService, set ,userID}) => {
-      const project =await projectService.deleteProject(params.id, userID);
+    async ({ params, projectService, set }) => {
+      const project = await projectService.deleteProject(params.id);
       set.status = HttpStatusCode.OK;
       return success(project, "Project deleted successfully");
     },

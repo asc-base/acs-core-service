@@ -18,11 +18,11 @@ import { PageableType } from "../../core/models";
 import { HttpStatusCode } from "../../core/types/http";
 
 interface IProjectService {
-  createProject(userID: number, projectData: CreateProjectDTO): Promise<ProjectDTO>;
+  createProject(projectData: CreateProjectDTO): Promise<ProjectDTO>;
   getProject(query: ProjectQueryParams): Promise<PageableType<typeof ProjectDTO>>;
   getProjectById(id: number): Promise<ProjectDTO | null>;
-  updateProject(projectID: number, userID: number, projectData: UpdateProjectDTO): Promise<ProjectDTO>;
-  deleteProject(id: number, userID: number): Promise<ProjectDTO | null>;
+  updateProject(projectID: number, projectData: UpdateProjectDTO): Promise<ProjectDTO>;
+  deleteProject(id: number): Promise<ProjectDTO | null>;
 }
 
 export class ProjectService implements IProjectService {
@@ -32,7 +32,7 @@ export class ProjectService implements IProjectService {
     private readonly projectFactory: IProjectFactory,
   ) { }
 
-  async createProject(userID: number, projectData: CreateProjectDTO): Promise<ProjectDTO> {
+  async createProject(projectData: CreateProjectDTO): Promise<ProjectDTO> {
     const {
       thumbnailFile,
       assets,
@@ -90,8 +90,6 @@ export class ProjectService implements IProjectService {
       thumbnailURL: thumbnailURL,
       assetsURL: assetsURLString,
       techStacks: techStackString,
-      createdBy: userID || 0,
-      updatedBy: userID || 0,
     }
 
     const createdProject = await this.projectRepository.createProject(createPayload);
@@ -99,23 +97,17 @@ export class ProjectService implements IProjectService {
     const projectTagsData: ProjectTagPayload[] = Array.from(new Set(tagsID)).map((tagID) => ({
       projectID: createdProject.id,
       tagID,
-      createdBy: userID || 0,
-      updatedBy: userID || 0,
     }));
 
     const projectMembersData: ProjectMemberPayload[] = members.map((member) => ({
       projectID: createdProject.id,
       userID: member.userID,
       roleID: member.roleID,
-      createdBy: userID || 0,
-      updatedBy: userID || 0,
     }));
 
     const projectCourseData: ProjectCoursePayload[] = Array.from(new Set(coursesID)).map((courseID) => ({
       projectID: createdProject.id,
       courseID,
-      createdBy: userID || 0,
-      updatedBy: userID || 0,
     }));
 
     await this.projectRepository.createProjectMember(projectMembersData);
@@ -156,7 +148,7 @@ export class ProjectService implements IProjectService {
     }
   }
 
-  async updateProject(id: number, userID: number, projectData: UpdateProjectDTO): Promise<ProjectDTO> {
+  async updateProject(id: number, projectData: UpdateProjectDTO): Promise<ProjectDTO> {
     const {
       thumbnailFile,
       assets,
@@ -215,7 +207,6 @@ export class ProjectService implements IProjectService {
       thumbnailURL,
       assetsURL: assetsURLString,
       techStacks: techStackString,
-      updatedBy: userID || 0,
       updatedAt: new Date(),
     }
     const updatedProject = await this.projectRepository.updateProject(id, updatedData);
@@ -224,8 +215,6 @@ export class ProjectService implements IProjectService {
       const data = Array.from(new Set(newtagsID)).map((tagID) => ({
         projectID: id,
         tagID,
-        createdBy: userID || 0,
-        updatedBy: userID || 0,
       }));
       await this.projectRepository.createProjectTag(data);
     }
@@ -239,8 +228,6 @@ export class ProjectService implements IProjectService {
         projectID: id,
         userID: member.userID,
         roleID: member.roleID,
-        createdBy: userID || 0,
-        updatedBy: userID || 0,
       }));
       await this.projectRepository.createProjectMember(data);
     }
@@ -253,8 +240,6 @@ export class ProjectService implements IProjectService {
       const data = Array.from(new Set(newCoursesID)).map((courseID) => ({
         projectID: id,
         courseID,
-        createdBy: userID || 0,
-        updatedBy: userID || 0,
       }));
       await this.projectRepository.createProjectCourse(data);
     }
@@ -266,8 +251,8 @@ export class ProjectService implements IProjectService {
     return this.projectFactory.mapProjectToDTO(updatedProject);
   }
 
-  async deleteProject(id: number, userID: number): Promise<ProjectDTO | null> {
-    const project = await this.projectRepository.deleteProject(id, userID);
+  async deleteProject(id: number): Promise<ProjectDTO | null> {
+    const project = await this.projectRepository.deleteProject(id);
     if (!project) {
       throw new AppError(
         ErrorCode.NOT_FOUND_ERROR,

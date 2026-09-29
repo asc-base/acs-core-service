@@ -38,8 +38,8 @@ export const StudentController = (app: Elysia) =>
           .use(roleMacro)
           .post(
             "",
-            async ({ body, studentService, set, userID }) => {
-              const student = await studentService.createStudent(body, userID);
+            async ({ body, studentService, set }) => {
+              const student = await studentService.createStudent(body);
               set.status = HttpStatusCode.CREATED;
               return success(
                 student,
@@ -54,12 +54,11 @@ export const StudentController = (app: Elysia) =>
           )
           .post(
             "/batch",
-            async ({ body, studentService, set, userID }) => {
+            async ({ body, studentService, set }) => {
               const { file, classBookID } = body;
               await studentService.importStudentsFromFile(
                 file,
                 classBookID,
-                userID,
               );
               set.status = HttpStatusCode.OK;
               return success(

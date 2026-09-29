@@ -65,8 +65,6 @@ export const CurriculumCreatePayloadSchema = t.Object({
   description: t.String(),
   thumbnailURL: t.String(),
   ...FocalPointInputFields,
-  createdBy: t.Number(),
-  updatedBy: t.Number()
 });
 
 export const CurriculumUpdatePayloadSchema = t.Partial(
@@ -77,7 +75,6 @@ export const CurriculumUpdatePayloadSchema = t.Partial(
     description: t.String(),
     thumbnailURL: t.String(),
     ...FocalPointInputFields,
-    updatedBy: t.Number()
   })
 );
 

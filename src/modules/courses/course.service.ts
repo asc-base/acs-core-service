@@ -14,10 +14,10 @@ import { PageableType } from "../../core/models";
 import { AppError } from "../../core/error/app-error";
 import { ErrorCode } from "../../core/types/errors";
 interface ICourseService {
-  createCourse(data: CreateCourseDTO, createdBy: number): Promise<CourseDTO>;
+  createCourse(data: CreateCourseDTO): Promise<CourseDTO>;
   getCourses(query: CourseQueryParams): Promise<PageableType<typeof CourseDTO>>;
   getCourseByID(id: number): Promise<CourseDTO | null>;
-  importCoursesFromFile(file: File, userID: number): Promise<void>;
+  importCoursesFromFile(file: File): Promise<void>;
 }
 
 export class CourseService implements ICourseService {
@@ -26,17 +26,12 @@ export class CourseService implements ICourseService {
     private readonly courseFactory: ICourseFactory,
   ) {}
 
-  async createCourse(
-    data: CreateCourseDTO,
-    createdBy: number,
-  ): Promise<CourseDTO> {
+  async createCourse(data: CreateCourseDTO): Promise<CourseDTO> {
     const { preCoursesID, ...courseData } = data;
 
     const course = await this.courseRepository.createCourse(
       {
         ...courseData,
-        createdBy: createdBy || 0,
-        updatedBy: 0,
       },
       preCoursesID ?? [],
     );
@@ -71,14 +66,12 @@ export class CourseService implements ICourseService {
   async updateCourse(
     courseId: number,
     data: UpdateCourseDTO,
-    updatedBy: number,
   ): Promise<CourseDTO | null> {
     const { newPrecourseId, deletePrecourseId, ...courseData } = data;
     const course = await this.courseRepository.updateCourse(
       courseId,
       {
         ...courseData,
-        updatedBy: updatedBy || 0,
       },
       newPrecourseId ?? [],
       deletePrecourseId ?? [],
@@ -88,20 +81,14 @@ export class CourseService implements ICourseService {
     return this.courseFactory.mapCourseToDTO(course);
   }
 
-  async deleteCourse(
-    courseId: number,
-    updatedBy: number,
-  ): Promise<CourseDTO | null> {
-    const course = await this.courseRepository.deleteCourse(
-      courseId,
-      updatedBy || 0,
-    );
+  async deleteCourse(courseId: number): Promise<CourseDTO | null> {
+    const course = await this.courseRepository.deleteCourse(courseId);
     if (!course) return null;
 
     return this.courseFactory.mapCourseToDTO(course);
   }
 
-  async importCoursesFromFile(file: File, userID: number): Promise<void> {
+  async importCoursesFromFile(file: File): Promise<void> {
     const fileName = file.name.toLowerCase();
     const isCSV = fileName.endsWith(".csv") || file.type === "text/csv";
     const isExcel = fileName.endsWith(".xlsx") || fileName.endsWith(".xls");
@@ -184,8 +171,6 @@ export class CourseService implements ICourseService {
 
       const course = {
         ...parsedRow,
-        createdBy: userID,
-        updatedBy: userID,
       } as CourseCreatePayload;
       validRecords.push(course);
     }

@@ -23,15 +23,11 @@ export class UserService implements IUserService {
     const hashedPassword = await hashPassword(password);
     const user = await this.userRepository.createUser({
       ...userData,
-      createdBy: 0,
-      updatedBy: 0,
     });
 
     const userRoles = await this.userRepository.assignUserRole({
       userID: user.id,
       roleID: 1,
-      createdBy: 0,
-      updatedBy: 0,
     });
 
     if (!userRoles) {

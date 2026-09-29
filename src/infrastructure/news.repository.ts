@@ -117,8 +117,6 @@ export class NewsRepository implements INewsRepository {
       thumbnailURL: newsFeatureData.thumbnailURL,
       thumbnailFocalPointX : newsFeatureData.thumbnailFocalPointX,
       thumbnailFocalPointY : newsFeatureData.thumbnailFocalPointY,
-      createdBy: newsFeatureData.createdBy ?? 0,
-      updatedBy: newsFeatureData.updatedBy ?? 0,
     };
 
     const newsFeature = await this.db.newsFeatures.create({
@@ -156,7 +154,6 @@ export class NewsRepository implements INewsRepository {
       thumbnailURL: newsFeatureData.thumbnailURL,
       thumbnailFocalPointX : newsFeatureData.thumbnailFocalPointX,
       thumbnailFocalPointY : newsFeatureData.thumbnailFocalPointY,
-      updatedBy: newsFeatureData.updatedBy ?? 0,
     };
 
     const newsFeature = await this.db.newsFeatures.update({
@@ -347,8 +344,6 @@ async createNewsAdditionalImages(
     data.map((item) => ({
       newsID: item.newsID,
       imageUrl: item.imageUrl,
-      createdBy: item.createdBy ?? 0,
-      updatedBy: item.updatedBy ?? 0,
     }));
 
   return await this.db.newsAdditionalImage.createManyAndReturn({

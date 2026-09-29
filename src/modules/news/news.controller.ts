@@ -31,8 +31,8 @@ export const createNewsController =
               .use(roleMacro)
               .post(
                 "",
-                async ({ newsService, body, set, userID }) => {
-                  const news = await newsService.createNews(body, userID);
+                async ({ newsService, body, set }) => {
+                  const news = await newsService.createNews(body);
                   set.status = HttpStatusCode.CREATED;
                   return success(
                     news,
@@ -47,8 +47,8 @@ export const createNewsController =
               )
               .put(
                 "/news-features",
-                async ({ newsService, body, set, userID }) => {
-                  const newsFeature = await newsService.upsertNewsFeature(body, userID);
+                async ({ newsService, body, set }) => {
+                  const newsFeature = await newsService.upsertNewsFeature(body);
                   set.status = HttpStatusCode.OK;
                   return success(
                     newsFeature,
@@ -62,11 +62,10 @@ export const createNewsController =
               )
               .patch(
                 "/:id",
-                async ({ newsService, params, body, userID }) => {
+                async ({ newsService, params, body }) => {
                   const news = await newsService.updateNews(
                     Number(params.id),
                     body,
-                    userID,
                   );
                   return success(news, "News updated successfully");
                 },

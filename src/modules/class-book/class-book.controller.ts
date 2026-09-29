@@ -33,8 +33,8 @@ export const ClassBookController = (app: Elysia) =>
           .use(roleMacro)
           .post(
             "",
-            async ({ classBookService, body, set, userID }) => {
-              const classBook = await classBookService.createClassBook(body, userID);
+            async ({ classBookService, body, set }) => {
+              const classBook = await classBookService.createClassBook(body);
               set.status = HttpStatusCode.CREATED;
               return success(
                 classBook,
@@ -49,11 +49,10 @@ export const ClassBookController = (app: Elysia) =>
           )
           .patch(
             "/:id",
-            async ({ classBookService, params, body, userID }) => {
+            async ({ classBookService, params, body }) => {
               const classBook = await classBookService.updateClassBook(
                 Number(params.id),
                 body,
-                userID,
               );
               return success(
                 classBook,

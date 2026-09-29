@@ -80,15 +80,11 @@ export const CreateUserModel = t.Object({
   imageFocalPointX: t.Optional(t.Nullable(t.Number())),
   imageFocalPointY: t.Optional(t.Nullable(t.Number())),
   prefix: t.Optional(t.Nullable(PrefixSchema)),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const CreateUserRoleModel = t.Object({
   userID: t.Number(),
   roleID: t.Number(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const UpdateUserModel = t.Partial(
@@ -97,7 +93,6 @@ export const UpdateUserModel = t.Partial(
     imageUrl: t.Optional(t.Nullable(t.String())),
     imageFocalPointX: t.Optional(t.Nullable(t.Number())),
     imageFocalPointY: t.Optional(t.Nullable(t.Number())),
-    updatedBy: t.Number(),
   }),
 );
 

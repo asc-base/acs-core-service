@@ -5,6 +5,7 @@ import type {
   News,
   NewsCreatePayload,
   NewsFeature,
+  NewsWithAdditionalImages,
 } from "../../../src/modules/news/domain/news";
 import type { INewsRepository } from "../../../src/modules/news/domain/news.repository";
 import { NewsFactory } from "../../../src/modules/news/news.factory";
@@ -13,8 +14,6 @@ import { NewsService } from "../../../src/modules/news/news.service";
 const startDate = new Date("2026-08-02T00:00:00.000Z");
 
 const newsFixture = (focalPoints?: {
-  cardFocalPointX?: number;
-  cardFocalPointY?: number;
   thumbnailFocalPointX?: number;
   thumbnailFocalPointY?: number;
 }): News => ({
@@ -23,19 +22,13 @@ const newsFixture = (focalPoints?: {
   detail: "News detail",
   startDate,
   dueDate: null,
-  image: "https://example.com/thumbnail.jpg",
   thumbnail: "https://example.com/thumbnail.jpg",
-  highlight: "https://example.com/highlight.jpg",
-  cardFocalPointX: focalPoints?.cardFocalPointX ?? null,
-  cardFocalPointY: focalPoints?.cardFocalPointY ?? null,
   thumbnailFocalPointX: focalPoints?.thumbnailFocalPointX ?? null,
   thumbnailFocalPointY: focalPoints?.thumbnailFocalPointY ?? null,
   tagID: 1,
   tag: { id: 1, name: "Announcement", tagsGroupsId: 1 },
   createdAt: startDate,
   updatedAt: startDate,
-  createdBy: 0,
-  updatedBy: 0,
   deletedAt: null,
 });
 
@@ -52,8 +45,8 @@ class FakeNewsRepository implements INewsRepository {
     return [this.news];
   }
 
-  async getNewsById(): Promise<News | null> {
-    return this.news;
+  async getNewsById(): Promise<NewsWithAdditionalImages | null> {
+    return { ...this.news, newsAdditionalImages: [] };
   }
 
   async upsertNewsFeature(): Promise<NewsFeature> {
@@ -86,8 +79,6 @@ class FakeNewsRepository implements INewsRepository {
 }
 
 const createNewsInput = (focalPoints?: {
-  cardFocalPointX?: number;
-  cardFocalPointY?: number;
   thumbnailFocalPointX?: number;
   thumbnailFocalPointY?: number;
 }): CreateNewsDTO => ({
@@ -95,9 +86,6 @@ const createNewsInput = (focalPoints?: {
   detail: "News detail",
   startDate,
   thumbnail: new File(["thumbnail"], "thumbnail.jpg", {
-    type: "image/jpeg",
-  }),
-  highlight: new File(["highlight"], "highlight.jpg", {
     type: "image/jpeg",
   }),
   tagID: 1,
@@ -115,11 +103,9 @@ const createService = (repository: FakeNewsRepository) => {
 };
 
 describe("NewsService", () => {
-  test("creates news with focal points", async () => {
+  test("creates news with thumbnail focal points", async () => {
     const repository = new FakeNewsRepository();
     repository.news = newsFixture({
-      cardFocalPointX: 25.5,
-      cardFocalPointY: 75.25,
       thumbnailFocalPointX: 40,
       thumbnailFocalPointY: 60,
     });
@@ -127,22 +113,16 @@ describe("NewsService", () => {
 
     const result = await service.createNews(
       createNewsInput({
-        cardFocalPointX: 25.5,
-        cardFocalPointY: 75.25,
         thumbnailFocalPointX: 40,
         thumbnailFocalPointY: 60,
       }),
     );
 
     expect(repository.createdPayload).toMatchObject({
-      cardFocalPointX: 25.5,
-      cardFocalPointY: 75.25,
       thumbnailFocalPointX: 40,
       thumbnailFocalPointY: 60,
     });
     expect(result).toMatchObject({
-      cardFocalPointX: 25.5,
-      cardFocalPointY: 75.25,
       thumbnailFocalPointX: 40,
       thumbnailFocalPointY: 60,
     });
@@ -154,8 +134,6 @@ describe("NewsService", () => {
 
     const result = await service.createNews(createNewsInput());
 
-    expect(repository.createdPayload).not.toHaveProperty("cardFocalPointX");
-    expect(repository.createdPayload).not.toHaveProperty("cardFocalPointY");
     expect(repository.createdPayload).not.toHaveProperty(
       "thumbnailFocalPointX",
     );
@@ -163,8 +141,6 @@ describe("NewsService", () => {
       "thumbnailFocalPointY",
     );
     expect(result).toMatchObject({
-      cardFocalPointX: null,
-      cardFocalPointY: null,
       thumbnailFocalPointX: null,
       thumbnailFocalPointY: null,
     });
@@ -172,7 +148,7 @@ describe("NewsService", () => {
 
   test("returns focal points from getNews", async () => {
     const repository = new FakeNewsRepository();
-    repository.news = newsFixture({ cardFocalPointX: 20, cardFocalPointY: 80 });
+    repository.news = newsFixture({ thumbnailFocalPointX: 20, thumbnailFocalPointY: 80 });
     const service = createService(repository);
 
     const result = await service.getNews({});
@@ -181,10 +157,8 @@ describe("NewsService", () => {
       rows: [
         {
           id: 1,
-          cardFocalPointX: 20,
-          cardFocalPointY: 80,
-          thumbnailFocalPointX: null,
-          thumbnailFocalPointY: null,
+          thumbnailFocalPointX: 20,
+          thumbnailFocalPointY: 80,
         },
       ],
       totalRecords: 1,
@@ -199,8 +173,6 @@ describe("NewsService", () => {
 
     expect(result).toMatchObject({
       id: 1,
-      cardFocalPointX: null,
-      cardFocalPointY: null,
       thumbnailFocalPointX: null,
       thumbnailFocalPointY: null,
     });

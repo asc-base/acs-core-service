@@ -29,8 +29,8 @@ export const CurriculumController = (app: Elysia) =>
           .use(roleMacro)
           .post(
             "",
-            async ({ curriculumService, body, set, userID }) => {
-              const curriculum = await curriculumService.createCurriculum(body, userID);
+            async ({ curriculumService, body, set }) => {
+              const curriculum = await curriculumService.createCurriculum(body);
               set.status = HttpStatusCode.CREATED;
               return success(
                 curriculum,
@@ -45,8 +45,8 @@ export const CurriculumController = (app: Elysia) =>
           )
           .patch(
             "/:id",
-            async ({ curriculumService, params: { id }, body, set, userID }) => {
-              const curriculum = await curriculumService.updateCurriculum(id, body, userID);
+            async ({ curriculumService, params: { id }, body, set }) => {
+              const curriculum = await curriculumService.updateCurriculum(id, body);
               
               set.status = HttpStatusCode.OK;
               return success(

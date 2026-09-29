@@ -27,9 +27,7 @@ model Role {
 
 model UserRole {
   id        Int       @id @default(autoincrement()) @map("id")
-  createdBy Int       @map("created_by")
   roleID    Int       @map("role_id")
-  updatedBy Int       @map("updated_by")
   userID    Int       @map("user_id")
   createdAt DateTime  @default(now()) @map("created_at")
   deletedAt DateTime? @map("deleted_at")
@@ -55,8 +53,6 @@ model User {
   lastNameEn    String?   @map("last_name_en")
   lastNameTh    String    @map("last_name_th")
   nickName      String?   @map("nick_name")
-  createdBy     Int       @map("created_by")
-  updatedBy     Int?      @map("updated_by")
   createdAt     DateTime  @default(now()) @map("created_at")
   deletedAt     DateTime? @map("deleted_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
@@ -177,8 +173,6 @@ model News {
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at")
   deletedAt    DateTime?      @map("deleted_at")
-  createdBy    Int            @map("created_by")
-  updatedBy    Int            @map("updated_by")
   tagID        Int            @map("tag_id")
   tag          Tag            @relation(fields: [tagID], references: [id])
   newsFeatures NewsFeatures[]
@@ -214,8 +208,6 @@ model Student {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
-  createdBy   Int       @map("created_by")
-  updatedBy   Int       @map("updated_by")
   user        User      @relation(fields: [userID], references: [id])
   classBook   ClassBook @relation(fields: [classBookID], references: [id])
 
@@ -232,8 +224,6 @@ model Curriculum {
   thumbnailURL String      @map("thumbnail_url")
   thumbnailFocalPointX Float? @map("thumbnail_focal_point_x")
   thumbnailFocalPointY Float? @map("thumbnail_focal_point_y")
-  createdBy    Int         @map("created_by")
-  updatedBy    Int         @map("updated_by")
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
   deletedAt    DateTime?   @map("deleted_at")
@@ -251,8 +241,6 @@ model Professor {
   phone              String    @map("phone")
   expertFields       String?   @map("expert_fields")
   educations         String?   @map("educations")
-  createdBy          Int       @map("created_by")
-  updatedBy          Int       @map("updated_by")
   createdAt          DateTime  @default(now()) @map("created_at")
   deletedAt          DateTime? @map("deleted_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
@@ -282,8 +270,6 @@ model Course {
   credits      String     @map("credits")
   typeCourseID Int        @map("type_course_id")
   curriculumID Int        @map("curriculum_id")
-  createdBy    Int        @map("created_by")
-  updatedBy    Int        @map("updated_by")
   createdAt    DateTime   @default(now()) @map("created_at")
   deletedAt    DateTime?  @map("deleted_at")  
   updatedAt    DateTime   @updatedAt @map("updated_at")
@@ -301,8 +287,6 @@ model PreCourse {
   id          Int      @id @default(autoincrement())
   courseID    Int      @map("course_id")
   preCourseID Int      @map("pre_course_id")
-  createdBy   Int      @map("created_by")
-  updatedBy   Int      @map("updated_by")
   createdAt   DateTime @default(now()) @map("created_at")
   deletedAt   DateTime? @map("deleted_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -328,8 +312,6 @@ model ClassBook {
   createdAt         DateTime   @default(now()) @map("created_at")
   updatedAt         DateTime   @updatedAt @map("updated_at")
   deletedAt         DateTime?  @map("deleted_at")
-  createdBy         Int        @map("created_by")
-  updatedBy         Int        @map("updated_by")
   curriculum        Curriculum @relation(fields: [curriculumID], references: [id])
   students          Student[]
 
@@ -342,8 +324,6 @@ model ClassBook {
 //   education   String     @map("education")
 //   professor   Professor? @relation(fields: [professorID], references: [id])
 //   professorID Int        @map("professor_id")
-//   createdBy   Int        @map("created_by")
-//   updatedBy   Int        @map("updated_by")
 //   createdAt   DateTime   @default(now()) @map("created_at")
 //   updatedAt   DateTime   @updatedAt @map("updated_at")
 //   deletedAt   DateTime?  @map("deleted_at")
@@ -372,8 +352,6 @@ model NewsFeatures {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
-  createdBy    Int       @map("created_by")
-  updatedBy    Int       @map("updated_by")
   news         News      @relation(fields: [newsID], references: [id])
   tag          Tag       @relation(fields: [tagID], references: [id])
   thumbnailFocalPointX Float? @map("thumbnail_focal_point_x")
@@ -401,8 +379,6 @@ model Project {
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
   deletedAt       DateTime?       @map("deleted_at")
-  createdBy       Int             @map("created_by")
-  updatedBy       Int             @map("updated_by")
   projectTags     ProjectTag[]
   projectMembers  ProjectMember[]
   projectCourses  ProjectCourse[]
@@ -418,8 +394,6 @@ model ProjectTag {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
-  createdBy Int       @map("created_by")
-  updatedBy Int       @map("updated_by")
 
   project Project @relation(fields: [projectID], references: [id])
   tag     Tag     @relation(fields: [tagID], references: [id])
@@ -437,8 +411,6 @@ model ProjectMember {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
-  createdBy Int       @map("created_by")
-  updatedBy Int       @map("updated_by")
 
   project Project @relation(fields: [projectID], references: [id])
   user    User    @relation(fields: [userID], references: [id])
@@ -456,8 +428,6 @@ model ProjectCourse {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
-  createdBy Int       @map("created_by")
-  updatedBy Int       @map("updated_by")
 
   project Project @relation(fields: [projectID], references: [id])
   course  Course    @relation(fields: [courseID], references: [id])

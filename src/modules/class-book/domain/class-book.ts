@@ -65,8 +65,6 @@ export const ClassBookCreatePayloadSchema = t.Object({
   thumbnailURL: t.String(),
   ...FocalPointFields,
   curriculumID: t.Number(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const ClassBookUpdatePayloadSchema = t.Partial(
@@ -76,7 +74,6 @@ export const ClassBookUpdatePayloadSchema = t.Partial(
     thumbnailURL: t.String(),
     ...FocalPointFields,
     curriculumID: t.Number(),
-    updatedBy: t.Number(),
   }),
 );
 

@@ -77,8 +77,6 @@ export const CourseCreatePayloadSchema = t.Object({
   ...CommonCourseField,
   typeCourseID: t.Number(),
   curriculumID: t.Number(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const CourseUpdatePayloadSchema = t.Partial(
@@ -86,7 +84,6 @@ export const CourseUpdatePayloadSchema = t.Partial(
     ...CommonCourseField,
     typeCourseID: t.Number(),
     curriculumID: t.Number(),
-    updatedBy: t.Number(),
     updatedAt: t.Date(),
     deletedAt: t.Nullable(t.Date()),
   }),

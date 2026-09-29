@@ -18,8 +18,6 @@ export class StudentRepository implements IStudentRepository {
       const student = await this.db.student.create({
         data: {
           ...data,
-          createdBy: data.createdBy ?? 0,
-          updatedBy: data.updatedBy ?? 0,
         },
         include: {
           user: {

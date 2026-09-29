@@ -137,8 +137,6 @@ export const NewsCreatePayloadSchema = t.Object({
   ...FocalPointInputFields,
   thumbnail: t.String(),
   tagID: t.Numeric(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const NewsUpdatePayloadSchema = t.Partial(
@@ -147,7 +145,6 @@ export const NewsUpdatePayloadSchema = t.Partial(
     ...FocalPointInputFields,
     thumbnail: t.String(),
     tagID: t.Numeric(),
-    updatedBy: t.Number(),
     updatedAt: t.Date(),
   })
 );
@@ -155,15 +152,11 @@ export const NewsUpdatePayloadSchema = t.Partial(
 export const NewsFeaturUpsertPayloadSchema = t.Object({
   ...CommonNewsFeatureFields,
   thumbnailURL: t.String(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const NewsAdditionalImageCreatePayloadSchema = t.Object({
   newsID: t.Numeric(),
   imageUrl: t.String(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export type CreateNewsDTO = Static<typeof CreateNewsDTO>;

@@ -7,9 +7,9 @@ set -e
 
 run_prisma() {
   if command -v bun >/dev/null 2>&1; then
-    bunx prisma "$@"
+    bunx --no-install prisma "$@"
   else
-    npx prisma "$@"
+    npx --no-install prisma "$@"
   fi
 }
 

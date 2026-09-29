@@ -22,7 +22,7 @@ import { PageableType } from "../../core/models";
 import { IUnitOfWork } from "../../core/uow/uow.interface";
 
 interface IStudentService {
-  createStudent(data: CreateStudentDTO, createdBy: number): Promise<StudentDTO>;
+  createStudent(data: CreateStudentDTO): Promise<StudentDTO>;
   getStudents(
     query: StudentQueryParams,
   ): Promise<PageableType<typeof StudentDTO>>;
@@ -32,7 +32,6 @@ interface IStudentService {
   importStudentsFromFile(
     file: File,
     classBookID: number,
-    userID: number,
   ): Promise<void>;
 }
 
@@ -47,7 +46,6 @@ export class StudentService implements IStudentService {
 
   async createStudent(
     data: CreateStudentDTO,
-    createdBy: number,
   ): Promise<StudentDTO> {
     const {
       imageFile,
@@ -80,8 +78,6 @@ export class StudentService implements IStudentService {
         imageUrl: imagePath,
         imageFocalPointX: imageFocalPointX,
         imageFocalPointY: imageFocalPointY,
-        createdBy: createdBy || 0,
-        updatedBy: createdBy || 0,
       };
 
       const user = await this.userRepository.createUser(rawUserData);
@@ -96,8 +92,6 @@ export class StudentService implements IStudentService {
       const role = await this.userRepository.assignUserRole({
         userID: user.id,
         roleID: 2,
-        createdBy: createdBy || 0,
-        updatedBy: createdBy || 0,
       });
 
       if (!role) {
@@ -110,8 +104,6 @@ export class StudentService implements IStudentService {
       const rawStudentData: StudentCreatePayload = {
         ...studentData,
         skills: skills ? skills.join(",") : null,
-        createdBy: createdBy || 0,
-        updatedBy: createdBy || 0,
         userID: user.id,
       };
 
@@ -214,7 +206,6 @@ export class StudentService implements IStudentService {
         ...userData,
         imageFocalPointX: imageFocalPointX,
         imageFocalPointY: imageFocalPointY,
-        updatedBy: 0,
       };
 
       const updateStudentData: StudentUpdatePayload = {
@@ -225,7 +216,6 @@ export class StudentService implements IStudentService {
         instagram,
         classBookID,
         skills: skills ? skills.join(",") : null,
-        updatedBy: 0,
       };
 
       student = await this.studentRepository.updateStudent(
@@ -257,7 +247,6 @@ export class StudentService implements IStudentService {
   async importStudentsFromFile(
     file: File,
     classBookID: number,
-    userID: number,
   ): Promise<void> {
     const fileName = file.name.toLowerCase();
     const isCSV = fileName.endsWith(".csv") || file.type === "text/csv";
@@ -362,16 +351,12 @@ export class StudentService implements IStudentService {
 
         const rawUserData: CreateUserModel = {
           ...userData,
-          createdBy: userID,
-          updatedBy: userID,
         };
 
         const user = await transaction.user.createUser(rawUserData);
         await transaction.user.assignUserRole({
           userID: user.id,
           roleID: 2,
-          createdBy: userID,
-          updatedBy: userID,
         });
 
         const rawStudentData: StudentCreatePayload = {
@@ -382,8 +367,6 @@ export class StudentService implements IStudentService {
           studentCode,
           classBookID,
           skills: skills ? skills.join(",") : null,
-          createdBy: userID,
-          updatedBy: userID,
           userID: user.id,
         };
 

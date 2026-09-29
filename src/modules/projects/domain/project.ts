@@ -124,8 +124,6 @@ export const ProjectCreatePayloadSchema = t.Object({ //มาดูอีกท�
   assetsURL: t.String(),
   ...FocalPointInputFields,
   techStacks: t.String(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const ProjectUpdatePayloadSchema = t.Partial(
@@ -141,7 +139,6 @@ export const ProjectUpdatePayloadSchema = t.Partial(
     assetsURL: t.String(),
     ...FocalPointInputFields,
     techStacks: t.String(),
-    updatedBy: t.Number(),
     updatedAt: t.Date(),
   })
 );
@@ -149,23 +146,17 @@ export const ProjectUpdatePayloadSchema = t.Partial(
 export const ProjectTagPayloadSchema = t.Object({
   projectID: t.Number(),
   tagID: t.Number(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const ProjectMemberPayloadSchema = t.Object({
   projectID: t.Number(),
   userID: t.Number(),
   roleID: t.Number(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const ProjectCoursePayloadSchema = t.Object({
   projectID: t.Number(),
   courseID: t.Number(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const ProjectIdParam = t.Object({
