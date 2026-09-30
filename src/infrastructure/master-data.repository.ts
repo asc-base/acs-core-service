@@ -3,6 +3,7 @@ import { IMasterDataRepository } from "../modules/master-data/domain/master-data
 import { Role } from "../core/models/role";
 import { Tag, TagGroup } from "../core/models/tag";
 import { TypeCourse } from "../core/models/type-course";
+import { Prefix } from "../core/models/prefix";
 
 export class MasterDataRepository implements IMasterDataRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -28,6 +29,10 @@ export class MasterDataRepository implements IMasterDataRepository {
   async getTypeCourses(): Promise<TypeCourse[]> {
     const typeCourses = await this.prisma.typeCourse.findMany();
     return typeCourses as TypeCourse[];
+  }
+
+  async getPrefixes(): Promise<Prefix[]> {
+    return this.prisma.prefix.findMany({ orderBy: { sequence: "asc" } });
   }
 
 }
