@@ -1,4 +1,3 @@
-import { SupabaseService } from "../../core/utils/supabase";
 import { IUserRepository } from "../users/domain/user.repository";
 import {
   CreateProfessorDTO,
@@ -13,11 +12,12 @@ import { UpdateUserModel } from "../users/domain/user";
 import { IProfessorRepository } from "./domain/professor.repository";
 import { IProfessorFactory } from "./profressor.factory";
 import { CreateUserModel } from "../users/domain/user";
-import { Prisma } from "../../generated/prisma/client";
 import { AppError } from "../../core/error/app-error";
 import { ErrorCode } from "../../core/types/errors";
-import { HttpStatusCode } from "../../core/types/http";
 import { PageableType } from "../../core/models";
+import { IUnitOfWork } from "../../core/uow/uow.interface";
+import { ProfileImageStorage, StoredImage } from "../../infrastructure/profile-image-storage";
+import { validateProfileImage } from "../users/profile-image-validation";
 interface IProfessorService {
   createProfessor(
     data: CreateProfessorDTO,
@@ -37,7 +37,8 @@ export class ProfessorService implements IProfessorService {
     private readonly professorRepository: IProfessorRepository,
     private readonly userRepository: IUserRepository,
     private readonly professorFactory: IProfessorFactory,
-    private readonly storage: SupabaseService,
+    private readonly storage: ProfileImageStorage,
+    private readonly unitOfWork: IUnitOfWork,
   ) { }
 
   async createProfessor(
@@ -55,150 +56,105 @@ export class ProfessorService implements IProfessorService {
       prefixID,
       ...rawProfessorData
     } = data;
-    let pathImage: string | null = null;
+    let storedImage: StoredImage | null = null;
     try {
-      if (imageFile) {
-        pathImage = await this.storage.uploadFile(imageFile, "professors");
+      const existingUser = await this.userRepository.getUserByEmail(email);
+      const existingProfessor = existingUser
+        ? await this.professorRepository.getProfessorByUserId(existingUser.id)
+        : null;
+      if (existingProfessor?.deletedAt === null) {
+        throw new AppError(
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "Professor with this email already exists",
+          400,
+        );
       }
 
-      const existingUser = await this.userRepository.getUserByEmail(email);
+      const contentType = imageFile
+        ? await validateProfileImage(imageFile)
+        : null;
+      if (imageFile && contentType) {
+        storedImage = await this.storage.upload(imageFile, contentType);
+      }
 
-      if (existingUser) {
-        const existingProfessor =
-          await this.professorRepository.getProfessorByUserId(existingUser.id);
+      const professor = await this.unitOfWork.runInTransaction(async (tx) => {
+        const image = storedImage
+          ? await tx.imageMedia.create({
+              ...storedImage,
+              fileName: imageFile!.name,
+              contentType: contentType!,
+              fileSize: imageFile!.size,
+            })
+          : null;
+        const userData: UpdateUserModel = {
+          firstNameTh,
+          prefixID,
+          lastNameTh,
+          firstNameEn,
+          lastNameEn,
+          ...(image && {
+            imageID: image.id,
+            imageUrl: storedImage!.imageUrl,
+            imageFocalPointX: imageFocalPointX ?? null,
+            imageFocalPointY: imageFocalPointY ?? null,
+          }),
+          ...(!image && { imageFocalPointX, imageFocalPointY }),
+        };
 
-        if (existingProfessor?.deletedAt === null) {
-          throw new AppError(
-            ErrorCode.DUPLICATE_DATA_ERROR,
-            "Professor with this email already exists",
-            400,
-          );
-        }
-
-        if (existingProfessor) {
-          const professorData: ProfessorUpdatePayload = {
-            ...rawProfessorData,
-            expertFields: rawProfessorData.expertFields,
-            educations: rawProfessorData.educations,
-            deletedAt: null,
-          };
-
-          const restoredProfessor =
-            await this.professorRepository.updateProfessor(
-              existingProfessor.id,
-              professorData,
-            );
-
-          const updatedUserData: UpdateUserModel = {
+        let user;
+        if (existingUser) {
+          user = await tx.user.updateUser(existingUser.id, userData);
+        } else {
+          const createUserData: CreateUserModel = {
             firstNameTh,
-            prefixID,
             lastNameTh,
             firstNameEn,
             lastNameEn,
-            imageFocalPointX,
-            imageFocalPointY,
-            ...(pathImage && { imageUrl: pathImage }),
+            prefixID,
+            email,
+            imageID: image?.id ?? null,
+            imageUrl: storedImage?.imageUrl ?? null,
+            imageFocalPointX: image ? imageFocalPointX ?? null : imageFocalPointX,
+            imageFocalPointY: image ? imageFocalPointY ?? null : imageFocalPointY,
           };
+          user = await tx.user.createUser(createUserData);
+          await tx.user.assignUserRole({ userID: user.id, roleID: 3 });
+        }
 
-          const updatedUser = await this.userRepository.updateUser(
-            existingUser.id,
-            updatedUserData,
-          );
-
-          restoredProfessor.user = updatedUser;
-
-          return this.professorFactory.mapProfessorToDTO(restoredProfessor);
+        let professor: Professor;
+        if (existingProfessor) {
+          professor = await tx.professor.updateProfessor(existingProfessor.id, {
+            ...rawProfessorData,
+            deletedAt: null,
+          });
         } else {
           const professorData: ProfessorCreatePayload = {
             ...rawProfessorData,
-            expertFields: rawProfessorData.expertFields,
-            educations: rawProfessorData.educations,
-            userID: existingUser.id,
+            userID: user.id,
           };
-
-          const newProfessor =
-            await this.professorRepository.createProfessor(professorData);
-
-          const hasProfessorRole = existingUser.userRoles?.some(
-            (role) => role.roleID === 3,
-          );
-
-          if (!hasProfessorRole) {
-            await this.userRepository.assignUserRole({
-              userID: existingUser.id,
-              roleID: 3,
-            });
+          professor = await tx.professor.createProfessor(professorData);
+          if (
+            existingUser &&
+            !existingUser.userRoles?.some((role) => role.roleID === 3)
+          ) {
+            await tx.user.assignUserRole({ userID: user.id, roleID: 3 });
           }
-
-          const updatedUserData: UpdateUserModel = {
-            firstNameTh,
-            prefixID,
-            lastNameTh,
-            firstNameEn,
-            lastNameEn,
-            imageFocalPointX,
-            imageFocalPointY,
-            ...(pathImage && { imageUrl: pathImage }),
-          };
-
-          const updatedUser = await this.userRepository.updateUser(
-            existingUser.id,
-            updatedUserData,
-          );
-
-          newProfessor.user = updatedUser;
-
-          return this.professorFactory.mapProfessorToDTO(newProfessor);
         }
-      }
-
-      const userData: CreateUserModel = {
-        firstNameTh,
-        prefixID,
-        lastNameTh,
-        firstNameEn,
-        lastNameEn,
-        email,
-        imageUrl: pathImage,
-        imageFocalPointX,
-        imageFocalPointY,
-      };
-
-      const user = await this.userRepository.createUser(userData);
-
-      if (!user) {
-        throw new AppError(
-          ErrorCode.DATABASE_ERROR,
-          "Failed to create user for professor",
-          500,
-        );
-      }
-
-      const role = await this.userRepository.assignUserRole({
-        userID: user.id,
-        roleID: 3,
+        professor.user = user;
+        return this.professorFactory.mapProfessorToDTO(professor);
       });
-
-      if (!role) {
-        throw new AppError(
-          ErrorCode.DATABASE_ERROR,
-          "Failed to assign role to student user",
-        );
-      }
-
-      const professorData: ProfessorCreatePayload = {
-        ...rawProfessorData,
-        expertFields: rawProfessorData.expertFields,
-        educations: rawProfessorData.educations,
-        userID: user.id,
-      };
-
-      const professor =
-        await this.professorRepository.createProfessor(professorData);
-
-      return this.professorFactory.mapProfessorToDTO(professor);
+      return professor;
     } catch (error) {
-      console.log(error);
+      if (storedImage) {
+        await this.storage
+          .delete(storedImage.bucket, storedImage.fileKey)
+          .catch((cleanupError) => {
+            console.error("Failed to clean up profile image", {
+              ...storedImage,
+              error: cleanupError,
+            });
+          });
+      }
       throw error;
     }
   }
@@ -247,12 +203,15 @@ export class ProfessorService implements IProfessorService {
       expertFields,
       ...UserData
     } = data;
-    let pathImage: string | undefined = undefined;
-    let professor: Professor | null;
+    const existing = await this.professorRepository.getProfessorById(professorID);
+    if (!existing) return null;
 
+    let storedImage: StoredImage | null = null;
+    let imageContentType: string | null = null;
     try {
       if (imageFile) {
-        pathImage = await this.storage.uploadFile(imageFile, "professors");
+        imageContentType = await validateProfileImage(imageFile);
+        storedImage = await this.storage.upload(imageFile, imageContentType);
       }
 
       const updatedProfessor: ProfessorUpdatePayload = {
@@ -262,43 +221,44 @@ export class ProfessorService implements IProfessorService {
         expertFields,
       };
 
-      professor = await this.professorRepository.updateProfessor(
-        professorID,
-        updatedProfessor,
-      );
-
-      if (!professor) {
-        return null;
-      }
-
-      const updatedUserData: UpdateUserModel = {
-        ...UserData,
-        ...(pathImage && { imageUrl: pathImage }),
-      };
-
-      const user = await this.userRepository.updateUser(
-        professor.userID,
-        updatedUserData,
-      );
-
-      if (!user) {
-        throw new AppError(
-          ErrorCode.DATABASE_ERROR,
-          "Failed to update user for professor",
-          500,
+      const professor = await this.unitOfWork.runInTransaction(async (tx) => {
+        const image = storedImage
+          ? await tx.imageMedia.create({
+              ...storedImage,
+              fileName: imageFile!.name,
+              contentType: imageContentType!,
+              fileSize: imageFile!.size,
+            })
+          : null;
+        const user = await tx.user.updateUser(existing.userID, {
+          ...UserData,
+          ...(image && {
+            imageID: image.id,
+            imageUrl: storedImage!.imageUrl,
+            imageFocalPointX: UserData.imageFocalPointX ?? null,
+            imageFocalPointY: UserData.imageFocalPointY ?? null,
+          }),
+        });
+        const updated = await tx.professor.updateProfessor(
+          professorID,
+          updatedProfessor,
         );
-      }
-
-      professor.user = user;
-
-      return this.professorFactory.mapProfessorToDTO(professor);
+        updated.user = user;
+        return this.professorFactory.mapProfessorToDTO(updated);
+      });
+      return professor;
     } catch (error) {
-      console.log(error);
-      throw new AppError(
-        ErrorCode.DATABASE_ERROR,
-        "Failed to update professor",
-        HttpStatusCode.INTERNAL_SERVER_ERROR,
-      );
+      if (storedImage) {
+        await this.storage
+          .delete(storedImage.bucket, storedImage.fileKey)
+          .catch((cleanupError) => {
+            console.error("Failed to clean up profile image", {
+              ...storedImage,
+              error: cleanupError,
+            });
+          });
+      }
+      throw error;
     }
   }
 

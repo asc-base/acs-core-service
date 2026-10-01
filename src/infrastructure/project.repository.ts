@@ -150,7 +150,7 @@ export class ProjectRepository implements IProjectRepository {
           include: { tag: true }
         },
         projectMembers: {
-          include: { user: true, role: true }
+          include: { user: { include: { imageMedia: true } }, role: true }
         },
         projectCourses: {
           include: {
@@ -177,7 +177,7 @@ export class ProjectRepository implements IProjectRepository {
             include: { tag: true },
           },
           projectMembers: {
-            include: { user: true, role: true },
+            include: { user: { include: { imageMedia: true } }, role: true },
           },
           projectCourses: {
             include: {

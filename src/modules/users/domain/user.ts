@@ -2,6 +2,7 @@ import { BaseModelSchema } from "../../../core/models";
 import { Static, t } from "elysia";
 import { RoleSchema } from "../../../core/models/role";
 import { PrefixSchema } from "../../../core/models/prefix";
+import { ImageMediaSchema } from "./image-media";
 
 export const FocalPointInputFields = {
   imageFocalPointX: t.Optional(t.Numeric()),
@@ -66,6 +67,8 @@ export const UserSchema = t.Intersect([
     id: t.Number(),
     ...CommonUserFields,
     imageUrl: t.Optional(t.Nullable(t.String())),
+    imageID: t.Optional(t.Nullable(t.Number())),
+    imageMedia: t.Optional(t.Nullable(t.Pick(ImageMediaSchema, ["provider", "imageUrl"]))),
     imageFocalPointX: t.Optional(t.Nullable(t.Number())),
     imageFocalPointY: t.Optional(t.Nullable(t.Number())),
     prefix: t.Optional(t.Nullable(PrefixSchema)),
@@ -76,10 +79,10 @@ export const UserSchema = t.Intersect([
 
 export const CreateUserModel = t.Object({
   ...CommonUserFields,
+  imageID: t.Optional(t.Nullable(t.Number())),
   imageUrl: t.Optional(t.Nullable(t.String())),
   imageFocalPointX: t.Optional(t.Nullable(t.Number())),
   imageFocalPointY: t.Optional(t.Nullable(t.Number())),
-  prefix: t.Optional(t.Nullable(PrefixSchema)),
 });
 
 export const CreateUserRoleModel = t.Object({
@@ -90,6 +93,7 @@ export const CreateUserRoleModel = t.Object({
 export const UpdateUserModel = t.Partial(
   t.Object({
     ...CommonUserFields,
+    imageID: t.Optional(t.Nullable(t.Number())),
     imageUrl: t.Optional(t.Nullable(t.String())),
     imageFocalPointX: t.Optional(t.Nullable(t.Number())),
     imageFocalPointY: t.Optional(t.Nullable(t.Number())),
@@ -99,6 +103,7 @@ export const UpdateUserModel = t.Partial(
 export const UserDTO = t.Object({
   id: t.Number(),
   ...CommonUserFields,
+  prefix: t.Optional(t.Nullable(PrefixSchema)),
   imageUrl: t.Optional(t.Nullable(t.String())),
   imageFocalPointX: t.Optional(t.Nullable(t.Number())),
   imageFocalPointY: t.Optional(t.Nullable(t.Number())),

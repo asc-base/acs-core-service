@@ -1,8 +1,6 @@
-import { SupabaseService } from "../../core/utils/supabase";
 import {
   CreateStudentDTO,
   StudentDTO,
-  Student,
   StudentQueryParams,
   StudentUpdateDTO,
   StudentCreatePayload,
@@ -13,13 +11,14 @@ import { parse } from "csv-parse/sync";
 import * as xlsx from "xlsx";
 import { Value } from "@sinclair/typebox/value";
 import { IStudentRepository } from "./domain/student.repository";
-import { IUserRepository } from "../users/domain/user.repository";
 import { CreateUserModel, UpdateUserModel } from "../users/domain/user";
 import { AppError } from "../../core/error/app-error";
 import { ErrorCode } from "../../core/types/errors";
 import { IStudentFactory } from "./student.factory";
 import { PageableType } from "../../core/models";
 import { IUnitOfWork } from "../../core/uow/uow.interface";
+import { ProfileImageStorage, StoredImage } from "../../infrastructure/profile-image-storage";
+import { validateProfileImage } from "../users/profile-image-validation";
 
 interface IStudentService {
   createStudent(data: CreateStudentDTO): Promise<StudentDTO>;
@@ -28,7 +27,11 @@ interface IStudentService {
   ): Promise<PageableType<typeof StudentDTO>>;
   getStudentById(id: number): Promise<StudentDTO | null>;
   deleteStudent(id: number): Promise<StudentDTO>;
-  updateStudent(studentID: number, data: StudentUpdateDTO): Promise<StudentDTO>;
+  updateStudent(
+    studentID: number,
+    data: StudentUpdateDTO,
+    actor: { userID: number; isAdmin: boolean },
+  ): Promise<StudentDTO>;
   importStudentsFromFile(
     file: File,
     classBookID: number,
@@ -38,8 +41,7 @@ interface IStudentService {
 export class StudentService implements IStudentService {
   constructor(
     private readonly studentRepository: IStudentRepository,
-    private readonly userRepository: IUserRepository,
-    private readonly storage: SupabaseService,
+    private readonly storage: ProfileImageStorage,
     private readonly studentFactory: IStudentFactory,
     private readonly unitOfWork: IUnitOfWork,
   ) { }
@@ -61,65 +63,58 @@ export class StudentService implements IStudentService {
       imageFocalPointY,
       ...studentData
     } = data;
-    let imagePath: string | null = null;
+    let storedImage: StoredImage | null = null;
+    let imageContentType: string | null = null;
     try {
       if (imageFile) {
-        imagePath = await this.storage.uploadFile(imageFile, "students");
+        imageContentType = await validateProfileImage(imageFile);
+        storedImage = await this.storage.upload(imageFile, imageContentType);
       }
 
-      const rawUserData: CreateUserModel = {
-        prefixID,
-        email,
-        firstNameTh,
-        lastNameTh,
-        nickName,
-        firstNameEn,
-        lastNameEn,
-        imageUrl: imagePath,
-        imageFocalPointX: imageFocalPointX,
-        imageFocalPointY: imageFocalPointY,
-      };
-
-      const user = await this.userRepository.createUser(rawUserData);
-
-      if (!user) {
-        throw new AppError(
-          ErrorCode.DATABASE_ERROR,
-          "Failed to create user for student",
-        );
-      }
-
-      const role = await this.userRepository.assignUserRole({
-        userID: user.id,
-        roleID: 2,
+      const student = await this.unitOfWork.runInTransaction(async (tx) => {
+        const image = storedImage
+          ? await tx.imageMedia.create({
+              ...storedImage,
+              fileName: imageFile!.name,
+              contentType: imageContentType!,
+              fileSize: imageFile!.size,
+            })
+          : null;
+        const rawUserData: CreateUserModel = {
+          prefixID,
+          email,
+          firstNameTh,
+          lastNameTh,
+          nickName,
+          firstNameEn,
+          lastNameEn,
+          imageID: image?.id ?? null,
+          imageUrl: storedImage?.imageUrl ?? null,
+          imageFocalPointX,
+          imageFocalPointY,
+        };
+        const user = await tx.user.createUser(rawUserData);
+        await tx.user.assignUserRole({ userID: user.id, roleID: 2 });
+        const rawStudentData: StudentCreatePayload = {
+          ...studentData,
+          skills: skills ? skills.join(",") : null,
+          userID: user.id,
+        };
+        const student = await tx.student.createStudent(rawStudentData);
+        return this.studentFactory.MapStudentToDTO(student);
       });
-
-      if (!role) {
-        throw new AppError(
-          ErrorCode.DATABASE_ERROR,
-          "Failed to assign role to student user",
-        );
-      }
-
-      const rawStudentData: StudentCreatePayload = {
-        ...studentData,
-        skills: skills ? skills.join(",") : null,
-        userID: user.id,
-      };
-
-      const student =
-        await this.studentRepository.createStudent(rawStudentData);
-
-      if (!student) {
-        throw new AppError(
-          ErrorCode.DATABASE_ERROR,
-          "Failed to create student",
-        );
-      }
-
-      return this.studentFactory.MapStudentToDTO(student);
+      return student;
     } catch (error) {
-      console.log(error);
+      if (storedImage) {
+        await this.storage
+          .delete(storedImage.bucket, storedImage.fileKey)
+          .catch((cleanupError) => {
+            console.error("Failed to clean up profile image", {
+              ...storedImage,
+              error: cleanupError,
+            });
+          });
+      }
       throw error;
     }
   }
@@ -180,6 +175,7 @@ export class StudentService implements IStudentService {
   async updateStudent(
     studentID: number,
     data: StudentUpdateDTO,
+    actor: { userID: number; isAdmin: boolean },
   ): Promise<StudentDTO> {
     const {
       imageFile,
@@ -194,19 +190,23 @@ export class StudentService implements IStudentService {
       imageFocalPointY,
       ...userData
     } = data;
-    let imagePath: string | undefined = undefined;
-    let student: Student;
+    if (!actor.isAdmin) {
+      const existing = await this.studentRepository.getStudentById(studentID);
+      if (!existing) {
+        throw new AppError(ErrorCode.NOT_FOUND_ERROR, "Student not found", 404);
+      }
+      if (existing.userID !== actor.userID) {
+        throw new AppError(ErrorCode.AUTHORIZATION_ERROR, "Forbidden", 403);
+      }
+    }
+
+    let storedImage: StoredImage | null = null;
+    let imageContentType: string | null = null;
     try {
       if (imageFile) {
-        imagePath = await this.storage.uploadFile(imageFile, "students");
+        imageContentType = await validateProfileImage(imageFile);
+        storedImage = await this.storage.upload(imageFile, imageContentType);
       }
-
-      const updatedUserData: UpdateUserModel = {
-        ...(imagePath && { imageUrl: imagePath }),
-        ...userData,
-        imageFocalPointX: imageFocalPointX,
-        imageFocalPointY: imageFocalPointY,
-      };
 
       const updateStudentData: StudentUpdatePayload = {
         studentCode,
@@ -218,28 +218,42 @@ export class StudentService implements IStudentService {
         skills: skills ? skills.join(",") : null,
       };
 
-      student = await this.studentRepository.updateStudent(
-        studentID,
-        updateStudentData,
-      );
-
-      const updateUser = await this.userRepository.updateUser(
-        student.userID,
-        updatedUserData,
-      );
-
-      if (!updateUser) {
-        throw new AppError(
-          ErrorCode.DATABASE_ERROR,
-          "Failed to update user for student",
-        );
-      }
-
-      student.user = updateUser;
-
-      return this.studentFactory.MapStudentToDTO(student);
+      const student = await this.unitOfWork.runInTransaction(async (tx) => {
+        const image = storedImage
+          ? await tx.imageMedia.create({
+              ...storedImage,
+              fileName: imageFile!.name,
+              contentType: imageContentType!,
+              fileSize: imageFile!.size,
+            })
+          : null;
+        const updatedUserData: UpdateUserModel = {
+          ...userData,
+          ...(image && {
+            imageID: image.id,
+            imageUrl: storedImage!.imageUrl,
+            imageFocalPointX: imageFocalPointX ?? null,
+            imageFocalPointY: imageFocalPointY ?? null,
+          }),
+          ...(!image && { imageFocalPointX, imageFocalPointY }),
+        };
+        const updated = await tx.student.updateStudent(studentID, updateStudentData);
+        const updateUser = await tx.user.updateUser(updated.userID, updatedUserData);
+        updated.user = updateUser;
+        return this.studentFactory.MapStudentToDTO(updated);
+      });
+      return student;
     } catch (error) {
-      console.log(error);
+      if (storedImage) {
+        await this.storage
+          .delete(storedImage.bucket, storedImage.fileKey)
+          .catch((cleanupError) => {
+            console.error("Failed to clean up profile image", {
+              ...storedImage,
+              error: cleanupError,
+            });
+          });
+      }
       throw error;
     }
   }

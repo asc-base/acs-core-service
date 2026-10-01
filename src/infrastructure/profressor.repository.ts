@@ -19,7 +19,7 @@ export class ProfessorRepository implements IProfessorRepository {
     const professor = await this.db.professor.create({
       data,
       include: {
-        user: { include: { prefix: true } },
+        user: { include: { prefix: true, imageMedia: true } },
       },
     });
     return professor as unknown as Professor;
@@ -57,7 +57,7 @@ export class ProfessorRepository implements IProfessorRepository {
         ...searchCondition,
       },
       include: {
-        user: { include: { prefix: true } },
+        user: { include: { prefix: true, imageMedia: true } },
       },
     });
     return professors as unknown as Professor[];
@@ -68,7 +68,7 @@ export class ProfessorRepository implements IProfessorRepository {
       const professor = await this.db.professor.findUnique({
         where: { id, deletedAt: null },
         include: {
-          user: { include: { prefix: true } },
+          user: { include: { prefix: true, imageMedia: true } },
         },
       });
       return professor as Professor | null;
@@ -91,7 +91,7 @@ export class ProfessorRepository implements IProfessorRepository {
       const professor = await this.db.professor.findUnique({
         where: { userID },
         include: {
-          user: { include: { prefix: true } },
+          user: { include: { prefix: true, imageMedia: true } },
         },
       });
       return professor as unknown as Professor | null;
@@ -114,7 +114,7 @@ export class ProfessorRepository implements IProfessorRepository {
       where: { id: professorID },
       data,
       include: {
-        user: { include: { prefix: true } },
+        user: { include: { prefix: true, imageMedia: true } },
       },
     });
     return professor as unknown as Professor;
@@ -146,7 +146,7 @@ export class ProfessorRepository implements IProfessorRepository {
           deletedAt: new Date(),
         },
         include: {
-          user: { include: { prefix: true } },
+          user: { include: { prefix: true, imageMedia: true } },
         },
       });
       return professor as unknown as Professor;

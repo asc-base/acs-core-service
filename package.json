@@ -7,6 +7,8 @@
     "start:dev": "bun src/index.ts",
     "dev:node": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "media:backfill": "tsx scripts/backfill-profile-media.ts",
+    "media:bootstrap-rustfs": "tsx scripts/bootstrap-profile-media.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "release:patch": "npm version patch && git push --follow-tags",

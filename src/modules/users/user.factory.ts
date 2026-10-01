@@ -17,7 +17,7 @@ export class UserFactory implements IUserFactory {
       lastNameEn: user.lastNameEn,
       email: user.email,
       nickName: user.nickName,
-      imageUrl: user.imageUrl,
+      imageUrl: user.imageMedia?.imageUrl ?? user.imageUrl,
       imageFocalPointX: user.imageFocalPointX ?? null,
       imageFocalPointY: user.imageFocalPointY ?? null,
     };

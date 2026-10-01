@@ -48,6 +48,7 @@ model User {
   firstNameEn   String?   @map("first_name_en")
   firstNameTh   String    @map("first_name_th")
   imageUrl      String?   @map("image_url")
+  imageID       Int?      @map("image_id")
   imageFocalPointX Float? @map("image_focal_point_x")
   imageFocalPointY Float? @map("image_focal_point_y")
   lastNameEn    String?   @map("last_name_en")
@@ -58,6 +59,7 @@ model User {
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   prefix         Prefix?     @relation(fields: [prefixID], references: [id])
+  imageMedia     ImageMedia? @relation(fields: [imageID], references: [id])
   userRoles      UserRole[]
   student        Student?
   professor      Professor?
@@ -65,6 +67,25 @@ model User {
   authUser       AuthUser?
 
   @@map("users")
+  @@schema("public")
+}
+
+model ImageMedia {
+  id          Int       @id @default(autoincrement()) @map("id")
+  provider    String    @map("provider")
+  bucket      String?   @map("bucket")
+  fileKey     String?   @map("file_key")
+  imageUrl    String    @unique @map("image_url")
+  fileName    String?   @map("file_name")
+  contentType String?   @map("content_type")
+  fileSize    Int?      @map("file_size")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  users       User[]
+
+  @@unique([provider, bucket, fileKey])
+  @@map("image_media")
   @@schema("public")
 }
 

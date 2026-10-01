@@ -41,7 +41,11 @@ export class RustFSRepository {
     });
   }
 
-  async uploadFile(file: File, folder = "uploads"): Promise<string> {
+  async uploadFile(
+    file: File,
+    folder = "uploads",
+    contentType = file.type || "application/octet-stream",
+  ): Promise<string> {
     if (!/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(folder)) {
       throw new Error("Invalid RustFS folder");
     }
@@ -53,7 +57,8 @@ export class RustFSRepository {
         Bucket: this.config.bucket,
         Key: fileKey,
         Body: new Uint8Array(await file.arrayBuffer()),
-        ContentType: file.type || "application/octet-stream",
+        ContentType: contentType,
+        Metadata: { "original-file-name": encodeURIComponent(file.name) },
       }),
     );
 

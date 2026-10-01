@@ -22,7 +22,8 @@ export class StudentRepository implements IStudentRepository {
         include: {
           user: {
             include: {
-              prefix: true
+              prefix: true,
+              imageMedia: true,
             }
           },
         },
@@ -82,7 +83,7 @@ export class StudentRepository implements IStudentRepository {
         [orderBy]: sortBy,
       },
       include: {
-        user: { include: { prefix: true } },
+        user: { include: { prefix: true, imageMedia: true } },
       },
     });
     return students as Student[];
@@ -93,7 +94,7 @@ export class StudentRepository implements IStudentRepository {
       const student = await this.db.student.findUnique({
         where: { id, deletedAt: null },
         include: {
-          user: { include: { prefix: true } },
+          user: { include: { prefix: true, imageMedia: true } },
         },
       });
       return student as Student | null;
@@ -116,7 +117,7 @@ export class StudentRepository implements IStudentRepository {
       const student = await this.db.student.findFirst({
         where: { user: { id: userId, deletedAt: null }, deletedAt: null },
         include: {
-          user: { include: { prefix: true } },
+          user: { include: { prefix: true, imageMedia: true } },
           classBook: true,
         },
       });
@@ -143,7 +144,7 @@ export class StudentRepository implements IStudentRepository {
           deletedAt: new Date(),
         },
         include: {
-          user: { include: { prefix: true } },
+          user: { include: { prefix: true, imageMedia: true } },
         },
       });
       return student as Student;
@@ -170,7 +171,7 @@ export class StudentRepository implements IStudentRepository {
         where: { id: studentID },
         data,
         include: {
-          user: { include: { prefix: true } },
+          user: { include: { prefix: true, imageMedia: true } },
         },
       });
       return student as Student;

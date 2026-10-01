@@ -17,7 +17,7 @@ Table public.users {
   nick_name text
 
   prefix_id int [ref: > prefixes.id]
-  image_id int [ref: > image_media.id]
+  image_id int [ref: > image_media.id, note: 'Central media reference; image_url retained during migration']
 
   // Legacy fields retained while media/profile migration is phased in.
   email_verified boolean [not null, default: false]
@@ -210,23 +210,23 @@ Table public.role_permissions {
 Table public.image_media {
   id int [pk, not null]
 
-  file_key text [unique, note: 'Nullable for legacy URL-only images']
+  provider text [not null, note: 'rustfs, supabase, or legacy_url']
+  bucket text
+  file_key text [note: 'Nullable for legacy URL-only images']
   file_name text
 
-  image_url text
+  image_url text [not null, unique]
 
   content_type varchar(100)
-
-  file_size bigint
-  width int
-  height int
-
-  focal_point_x float
-  focal_point_y float
+  file_size int
 
   created_at timestamp [not null]
   updated_at timestamp
   deleted_at timestamp
+
+  indexes {
+    (provider, bucket, file_key) [unique]
+  }
 }
 
 
