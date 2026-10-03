@@ -21,7 +21,7 @@ CMD [ "bun", "--watch", "src/index.ts" ]
 
 FROM local AS development
 
-FROM node:22-alpine AS node-base
+FROM node:24-alpine AS node-base
 WORKDIR /usr/src/app
 
 RUN apk add --no-cache netcat-openbsd openssl
