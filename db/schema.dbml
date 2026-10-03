@@ -277,6 +277,9 @@ Table public.news_images {
   image_id int [ref: > image_media.id, not null]
 
   image_type news_image_type [not null]
+  focal_point_x float [note: 'Object-position percentage from 0 to 100']
+  focal_point_y float [note: 'Object-position percentage from 0 to 100']
+  sort_order int [not null, default: 0]
 
   created_at timestamp [not null]
   updated_at timestamp
@@ -285,6 +288,7 @@ Table public.news_images {
   indexes {
     news_id
     image_id
+    (news_id, image_id, image_type) [unique]
   }
 }
 

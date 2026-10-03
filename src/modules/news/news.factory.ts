@@ -13,11 +13,18 @@ export class NewsFactory {
       id: news.id,
       title: news.title,
       thumbnailURL: news.thumbnail,
+      highlightURL: news.images?.find((image) => image.imageType === "THUMBNAIL")?.imageUrl,
       detail: news.detail,
       startDate: news.startDate,
       dueDate: news.dueDate,
       thumbnailFocalPointX: news.thumbnailFocalPointX,
       thumbnailFocalPointY: news.thumbnailFocalPointY,
+      cardFocalPointX: news.images?.find((image) => image.imageType === "CARD")?.focalPointX ?? news.thumbnailFocalPointX,
+      cardFocalPointY: news.images?.find((image) => image.imageType === "CARD")?.focalPointY ?? news.thumbnailFocalPointY,
+      category: news.category,
+      images: news.images,
+      eventStartAt: news.eventStartAt ?? news.startDate,
+      eventEndAt: news.eventEndAt ?? news.dueDate,
       tag: news.tag
         ? {
           id: news.tag.id,

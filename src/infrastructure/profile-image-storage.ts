@@ -13,7 +13,7 @@ export type StoredImage = {
 
 export interface ProfileImageStorage {
   readonly provider: ProfileImageProvider;
-  upload(file: File, contentType: string): Promise<StoredImage>;
+  upload(file: File, contentType: string, folder?: string): Promise<StoredImage>;
   delete(bucket: string, fileKey: string): Promise<void>;
 }
 
@@ -38,8 +38,8 @@ class RustFSProfileImageStorage implements ProfileImageStorage {
     });
   }
 
-  async upload(file: File, contentType: string): Promise<StoredImage> {
-    const fileKey = await this.repository.uploadFile(file, "profiles", contentType);
+  async upload(file: File, contentType: string, folder = "profiles"): Promise<StoredImage> {
+    const fileKey = await this.repository.uploadFile(file, folder, contentType);
     return {
       provider: this.provider,
       bucket: this.bucket,
@@ -62,10 +62,10 @@ class SupabaseProfileImageStorage implements ProfileImageStorage {
     private readonly bucket: string,
   ) {}
 
-  async upload(file: File, contentType: string): Promise<StoredImage> {
+  async upload(file: File, contentType: string, folder = "profiles"): Promise<StoredImage> {
     return {
       provider: this.provider,
-      ...(await this.service.uploadFileWithMetadata(file, "profiles", contentType)),
+      ...(await this.service.uploadFileWithMetadata(file, folder, contentType)),
     };
   }
 
@@ -75,8 +75,8 @@ class SupabaseProfileImageStorage implements ProfileImageStorage {
   }
 }
 
-export function createProfileImageStorage(): ProfileImageStorage {
-  if (config.PROFILE_MEDIA_PROVIDER === "supabase") {
+export function createImageStorage(provider: string): ProfileImageStorage {
+  if (provider === "supabase") {
     if (!config.SUPABASE_URL || !config.SUPABASE_KEY || !config.BUCKET_NAME || config.BUCKET_NAME === "undefined") {
       throw new Error("Supabase profile media configuration is incomplete");
     }
@@ -86,8 +86,8 @@ export function createProfileImageStorage(): ProfileImageStorage {
     );
   }
 
-  if (config.PROFILE_MEDIA_PROVIDER !== "rustfs") {
-    throw new Error("PROFILE_MEDIA_PROVIDER must be rustfs or supabase");
+  if (provider !== "rustfs") {
+    throw new Error("Media provider must be rustfs or supabase");
   }
 
   const {
@@ -131,4 +131,17 @@ export function createProfileImageStorage(): ProfileImageStorage {
     accessKeyId,
     secretAccessKey,
   );
+}
+
+export const createProfileImageStorage = () =>
+  createImageStorage(config.PROFILE_MEDIA_PROVIDER);
+
+export function createNewsImageStorage(): ProfileImageStorage {
+  let storage: ProfileImageStorage | undefined;
+  const getStorage = () => (storage ??= createImageStorage(config.NEWS_MEDIA_PROVIDER));
+  return {
+    get provider() { return getStorage().provider; },
+    upload: (file, contentType, folder) => getStorage().upload(file, contentType, folder),
+    delete: (bucket, fileKey) => getStorage().delete(bucket, fileKey),
+  };
 }

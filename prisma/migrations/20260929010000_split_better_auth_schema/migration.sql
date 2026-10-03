@@ -1,6 +1,6 @@
 BEGIN;
 
-CREATE SCHEMA "auth";
+CREATE SCHEMA IF NOT EXISTS "auth";
 
 CREATE TABLE "auth"."users" (
     "id" INTEGER NOT NULL,

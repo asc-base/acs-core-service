@@ -83,6 +83,7 @@ model ImageMedia {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
   users       User[]
+  newsImages  NewsImage[]
 
   @@unique([provider, bucket, fileKey])
   @@map("image_media")
@@ -196,10 +197,78 @@ model News {
   deletedAt    DateTime?      @map("deleted_at")
   tagID        Int            @map("tag_id")
   tag          Tag            @relation(fields: [tagID], references: [id])
+  newsCategoryID Int?          @map("news_category_id")
+  newsCategory   NewsCategory? @relation(fields: [newsCategoryID], references: [id])
+  eventStartAt   DateTime?      @map("event_start_at")
+  eventEndAt     DateTime?      @map("event_end_at")
   newsFeatures NewsFeatures[]
   newsAdditionalImages NewsAdditionalImage[]
+  newsImages   NewsImage[]
+  newsBulletins NewsBulletin[]
 
   @@map("news")
+  @@schema("public")
+}
+
+model NewsCategory {
+  id   Int    @id @default(autoincrement()) @map("id")
+  code String @unique @map("code")
+  name String @map("name")
+  news News[]
+
+  @@map("news_categories")
+  @@schema("public")
+}
+
+model NewsImage {
+  id          Int           @id @default(autoincrement()) @map("id")
+  newsID      Int           @map("news_id")
+  imageID     Int           @map("image_id")
+  imageType   NewsImageType @map("image_type")
+  focalPointX Float?        @map("focal_point_x")
+  focalPointY Float?        @map("focal_point_y")
+  sortOrder   Int           @default(0) @map("sort_order")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  deletedAt   DateTime?     @map("deleted_at")
+  news        News          @relation(fields: [newsID], references: [id])
+  image       ImageMedia    @relation(fields: [imageID], references: [id])
+
+  @@unique([newsID, imageID, imageType])
+  @@index([newsID])
+  @@index([imageID])
+  @@map("news_images")
+  @@schema("public")
+}
+
+model NewsBulletin {
+  id        Int              @id @default(autoincrement()) @map("id")
+  newsID    Int              @map("news_id")
+  type      NewsBulletinType @map("type")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+  deletedAt DateTime?        @map("deleted_at")
+  news      News             @relation(fields: [newsID], references: [id])
+
+  @@unique([newsID, type])
+  @@map("news_bulletins")
+  @@schema("public")
+}
+
+enum NewsImageType {
+  CARD
+  THUMBNAIL
+  DETAIL
+
+  @@map("news_image_type")
+  @@schema("public")
+}
+
+enum NewsBulletinType {
+  HIGHLIGHT
+  ANNOUNCEMENT
+
+  @@map("news_bulletin_type")
   @@schema("public")
 }
 

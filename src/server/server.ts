@@ -33,6 +33,13 @@ export class Server {
       )
       .onRequest(({ request }) => {
         console.info(`${request.method} ${new URL(request.url).pathname}`);
+        const { pathname } = new URL(request.url);
+        const isNewsUpload = (request.method === "POST" && pathname === "/api/v1/news")
+          || (request.method === "PATCH" && /^\/api\/v1\/news\/\d+$/.test(pathname));
+        const contentLength = Number(request.headers.get("content-length"));
+        if (isNewsUpload && contentLength > 64 * 1024 * 1024) {
+          return new Response("News uploads are limited to 64 MiB", { status: 413 });
+        }
       })
       .mount(auth.handler)
       .use(RouteSetup);

@@ -38,19 +38,17 @@ try {
       Bucket: bucket,
       Policy: JSON.stringify({
         Version: "2012-10-17",
-        Statement: [
-          {
-            Sid: "PublicReadProfileImages",
+        Statement: ["profiles", "news"].map((folder) => ({
+            Sid: `PublicRead${folder}`,
             Effect: "Allow",
             Principal: "*",
             Action: ["s3:GetObject"],
-            Resource: [`arn:aws:s3:::${bucket}/public/profiles/*`],
-          },
-        ],
+            Resource: [`arn:aws:s3:::${bucket}/public/${folder}/*`],
+          })),
       }),
     }),
   );
-  console.log(`Bucket ${bucket} is ready with profile-only public reads`);
+  console.log(`Bucket ${bucket} is ready with profile and news public reads`);
 } finally {
   client.destroy();
 }

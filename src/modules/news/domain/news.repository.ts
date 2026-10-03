@@ -1,4 +1,3 @@
-import { promises } from "node:dns";
 import {
   News,
   NewsQueryParams,
@@ -7,14 +6,14 @@ import {
   NewsCreatePayload,
   NewsFeatureUpsertPayload,
   NewsUpdatePayload,
-  NewsAdditionalImage,
-  NewsAdditionalImageCreatePayload,
   NewsWithAdditionalImages,
+  NewsBulletinType,
+  NewsBulletinView,
 } from "./news";
 
 
 export interface INewsRepository {
-  createNews(data: NewsCreatePayload): Promise<News>;
+  createNews(data: NewsCreatePayload): Promise<NewsWithAdditionalImages>;
   getNews(query: NewsQueryParams): Promise<News[]>;
   getNewsById(id: number): Promise<NewsWithAdditionalImages | null>;
   createNewsFeature(
@@ -32,10 +31,7 @@ export interface INewsRepository {
   updateNews(
     id: number,
     data: NewsUpdatePayload,
-  ): Promise<News>;
-  createNewsAdditionalImages(
-    data: NewsAdditionalImageCreatePayload[],
-  ): Promise<NewsAdditionalImage[]>;
-  getNewsAdditionalImagesByNewsId(newsID: number): Promise<NewsAdditionalImage[]>;
-  deleteNewsAdditionalImages(data : number[]): Promise<NewsAdditionalImage[]>;
+  ): Promise<NewsWithAdditionalImages>;
+  getNewsBulletins(type: NewsBulletinType): Promise<NewsBulletinView[]>;
+  setNewsBulletin(newsID: number, type: NewsBulletinType, enabled: boolean): Promise<NewsBulletinView | null>;
 }

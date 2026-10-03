@@ -1,23 +1,25 @@
 import Elysia from "elysia";
+import { t } from "elysia";
 import { NewsRepository } from "../../infrastructure/news.repository";
 import { prisma } from "../../lib/db";
 import { NewsService } from "./news.service";
 import { NewsDocs } from "./news.docs";
 import { success } from "../../core/interceptor/response";
 import { NewsFactory } from "./news.factory";
-import { SupabaseService } from "../../core/utils/supabase";
+import { createNewsImageStorage } from "../../infrastructure/profile-image-storage";
 import { HttpStatusCode } from "../../core/types/http";
 import { authMiddleware } from "../../middleware/auth";
 import { roleMacro } from "../../middleware/checkRole";
 import { PERMISSION } from "../../core/permission/permission";
+import { AppError } from "../../core/error/app-error";
 
 const newsRepository = new NewsRepository(prisma);
 const newsFactory = new NewsFactory();
-const supabaseService = new SupabaseService();
+const newsImageStorage = createNewsImageStorage();
 const defaultNewsService = new NewsService(
   newsRepository,
   newsFactory,
-  supabaseService,
+  newsImageStorage,
 );
 
 export const createNewsController =
@@ -86,6 +88,64 @@ export const createNewsController =
                   checkRole: PERMISSION.ADMINPERSMISSION,
                 },
               ),
+          )
+          .group("/:id/bulletins", (app) =>
+            app
+              .guard({}, (admin) => admin
+                .use(authMiddleware)
+                .use(roleMacro)
+                .put(
+                  "/:type",
+                  async ({ newsService, params, set }) => {
+                    const newsID = Number(params.id);
+                    const type = params.type;
+                    try {
+                      const bulletin = await newsService.setNewsBulletin(newsID, type, true);
+                      if (!bulletin) throw new Error("News bulletin not found");
+                      return success(bulletin, "News bulletin enabled successfully");
+                    } catch (error) {
+                      if (error instanceof AppError && error.statusCode === HttpStatusCode.NOT_FOUND) {
+                        set.status = HttpStatusCode.NOT_FOUND;
+                        return success(null, "News not found", HttpStatusCode.NOT_FOUND);
+                      }
+                      throw error;
+                    }
+                  },
+                  {
+                    params: t.Object({ id: t.Numeric(), type: t.Union([t.Literal("HIGHLIGHT"), t.Literal("ANNOUNCEMENT")]) }),
+                    response: { 200: t.Any(), 404: t.Any() },
+                    checkRole: PERMISSION.ADMINPERSMISSION,
+                  },
+                )
+                .delete(
+                  "/:type",
+                  async ({ newsService, params, set }) => {
+                    const newsID = Number(params.id);
+                    const result = await newsService.setNewsBulletin(newsID, params.type, false);
+                    if (!result) {
+                      set.status = HttpStatusCode.NOT_FOUND;
+                      return success(null, "News bulletin not found", HttpStatusCode.NOT_FOUND);
+                    }
+                    return success(null, "News bulletin disabled successfully");
+                  },
+                  {
+                    params: t.Object({ id: t.Numeric(), type: t.Union([t.Literal("HIGHLIGHT"), t.Literal("ANNOUNCEMENT")]) }),
+                    response: { 200: t.Any(), 404: t.Any() },
+                    checkRole: PERMISSION.ADMINPERSMISSION,
+                  },
+                ),
+              ),
+          )
+          .get(
+            "/bulletins",
+            async ({ newsService, query }) => {
+              const rows = await newsService.getNewsBulletins(query.type);
+              return success(rows, "News bulletins retrieved successfully");
+            },
+            {
+              query: t.Object({ type: t.Union([t.Literal("HIGHLIGHT"), t.Literal("ANNOUNCEMENT")]) }),
+              response: { 200: t.Any() },
+            },
           )
           .get(
             "",

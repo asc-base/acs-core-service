@@ -9,4 +9,5 @@ export interface IMasterDataRepository {
   getTagGroup(): Promise<TagGroup[]>;
   getTypeCourses(): Promise<TypeCourse[]>;
   getPrefixes(): Promise<Prefix[]>;
+  getNewsCategories(): Promise<Array<{ id: number; code: string; name: string }>>;
 }

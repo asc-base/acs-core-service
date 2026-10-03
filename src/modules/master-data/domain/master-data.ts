@@ -4,6 +4,8 @@ import { TypeCourseSchema } from "../../../core/models/type-course";
 import { Tag, TagGroup } from "../../../core/models/tag";
 import { PrefixSchema } from "../../../core/models/prefix";
 
+const NewsCategorySchema = t.Object({ id: t.Number(), code: t.String(), name: t.String() });
+
 export const MasterData = t.Intersect([
   t.Object({
     roles: t.Array(RoleSchema),
@@ -11,6 +13,7 @@ export const MasterData = t.Intersect([
     tagsGroups: t.Array(TagGroup),
     tags: t.Array(Tag),
     prefixes: t.Array(PrefixSchema),
+    newsCategories: t.Array(NewsCategorySchema),
   }),
 ]);
 

@@ -1,197 +1,68 @@
-import { createHmac } from "node:crypto";
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, vi } from "vitest";
 import { Elysia } from "elysia";
 import { responseEnhancer } from "../../../src/core/interceptor/response";
-import type { NewsDTO } from "../../../src/modules/news/domain/news";
+import type { NewsDTO, NewsWithAdditionalImageDTO } from "../../../src/modules/news/domain/news";
 import { createNewsController } from "../../../src/modules/news/news.controller";
 import type { NewsService } from "../../../src/modules/news/news.service";
 
-const startDate = "2026-08-02T00:00:00.000Z";
+vi.mock("../../../src/lib/db", () => ({ prisma: {} }));
 
-const newsFixture = (focalPoints?: {
-  cardFocalPointX?: number;
-  cardFocalPointY?: number;
-  thumbnailFocalPointX?: number;
-  thumbnailFocalPointY?: number;
-}): NewsDTO => ({
-  id: 1,
+const newsFixture = (): NewsDTO => ({
+  id: 7,
   title: "News title",
   detail: "News detail",
-  startDate: new Date(startDate),
+  startDate: new Date("2026-08-02T00:00:00.000Z"),
   dueDate: null,
-  thumbnailURL: "https://example.com/thumbnail.jpg",
-  highlightURL: "https://example.com/highlight.jpg",
-  cardFocalPointX: focalPoints?.cardFocalPointX ?? null,
-  cardFocalPointY: focalPoints?.cardFocalPointY ?? null,
-  thumbnailFocalPointX: focalPoints?.thumbnailFocalPointX ?? null,
-  thumbnailFocalPointY: focalPoints?.thumbnailFocalPointY ?? null,
-  tag: { id: 1, name: "Announcement", tagsGroupsId: 1 },
+  thumbnailURL: "https://example.com/card.jpg",
+  highlightURL: "https://example.com/thumbnail.jpg",
+  cardFocalPointX: 25,
+  cardFocalPointY: 75,
+  thumbnailFocalPointX: 40,
+  thumbnailFocalPointY: 60,
+  category: { id: 3, code: "ANNOUNCEMENT", name: "ข่าวประชาสัมพันธ์" },
+  images: [{ id: 1, imageID: 12, imageType: "THUMBNAIL", imageUrl: "https://example.com/thumbnail.jpg", focalPointX: 40, focalPointY: 60, sortOrder: 0 }],
+  tag: { id: 3, name: "ข่าวประชาสัมพันธ์", tagsGroupsId: 4 },
 });
-
-const createAdminToken = () => {
-  const encode = (value: object) =>
-    Buffer.from(JSON.stringify(value)).toString("base64url");
-  const header = encode({ alg: "HS256", typ: "JWT" });
-  const payload = encode({
-    id: 1,
-    roles: ["admin"],
-    exp: Math.floor(Date.now() / 1000) + 60,
-  });
-  const signature = createHmac("sha256", process.env.JWT_SECRET || "secret")
-    .update(`${header}.${payload}`)
-    .digest("base64url");
-
-  return `${header}.${payload}.${signature}`;
-};
-
-const createNewsForm = (focalPoints?: {
-  cardFocalPointX?: number;
-  cardFocalPointY?: number;
-  thumbnailFocalPointX?: number;
-  thumbnailFocalPointY?: number;
-}) => {
-  const form = new FormData();
-  form.set("title", "News title");
-  form.set("detail", "News detail");
-  form.set("startDate", startDate);
-  form.set("tagID", "1");
-  form.set(
-    "thumbnail",
-    new File(["thumbnail"], "thumbnail.jpg", { type: "image/jpeg" }),
-  );
-  form.set(
-    "highlight",
-    new File(["highlight"], "highlight.jpg", { type: "image/jpeg" }),
-  );
-
-  for (const [key, value] of Object.entries(focalPoints ?? {})) {
-    form.set(key, String(value));
-  }
-
-  return form;
-};
 
 const createApp = (newsService: NewsService) =>
   new Elysia().use(responseEnhancer).use(createNewsController(newsService));
 
-describe("news HTTP endpoints", () => {
-  test("POST /news accepts focal points", async () => {
-    let receivedBody: Record<string, unknown> | undefined;
+describe("news read endpoints", () => {
+  test("returns news with category, role images, and focal points", async () => {
     const app = createApp({
-      createNews: async (body) => {
-        receivedBody = body as Record<string, unknown>;
-        return newsFixture({
-          cardFocalPointX: 25.5,
-          cardFocalPointY: 75.25,
-          thumbnailFocalPointX: 40,
-          thumbnailFocalPointY: 60,
-        });
-      },
-    } as NewsService);
-
-    const response = await app.handle(
-      new Request("http://localhost/news", {
-        method: "POST",
-        headers: { cookie: `accessToken=${createAdminToken()}` },
-        body: createNewsForm({
-          cardFocalPointX: 25.5,
-          cardFocalPointY: 75.25,
-          thumbnailFocalPointX: 40,
-          thumbnailFocalPointY: 60,
-        }),
-      }),
-    );
-    const body = await response.json();
-
-    expect(response.status).toBe(201);
-    expect(receivedBody).toMatchObject({
-      cardFocalPointX: 25.5,
-      cardFocalPointY: 75.25,
-      thumbnailFocalPointX: 40,
-      thumbnailFocalPointY: 60,
-    });
-    expect(body.data).toMatchObject({
-      cardFocalPointX: 25.5,
-      cardFocalPointY: 75.25,
-      thumbnailFocalPointX: 40,
-      thumbnailFocalPointY: 60,
-    });
-  });
-
-  test("POST /news accepts news without focal points", async () => {
-    let receivedBody: Record<string, unknown> | undefined;
-    const app = createApp({
-      createNews: async (body) => {
-        receivedBody = body as Record<string, unknown>;
-        return newsFixture();
-      },
-    } as NewsService);
-
-    const response = await app.handle(
-      new Request("http://localhost/news", {
-        method: "POST",
-        headers: { cookie: `accessToken=${createAdminToken()}` },
-        body: createNewsForm(),
-      }),
-    );
-    const body = await response.json();
-
-    expect(response.status).toBe(201);
-    expect(receivedBody).not.toHaveProperty("cardFocalPointX");
-    expect(receivedBody).not.toHaveProperty("cardFocalPointY");
-    expect(receivedBody).not.toHaveProperty("thumbnailFocalPointX");
-    expect(receivedBody).not.toHaveProperty("thumbnailFocalPointY");
-    expect(body.data).toMatchObject({
-      cardFocalPointX: null,
-      cardFocalPointY: null,
-      thumbnailFocalPointX: null,
-      thumbnailFocalPointY: null,
-    });
-  });
-
-  test("GET /news returns focal points", async () => {
-    const app = createApp({
-      getNews: async () => ({
-        rows: [newsFixture({ cardFocalPointX: 20, cardFocalPointY: 80 })],
-        totalRecords: 1,
-        page: 1,
-        pageSize: 10,
-      }),
-    } as NewsService);
-
+      getNews: async () => ({ rows: [newsFixture()], totalRecords: 1, page: 1, pageSize: 10 }),
+    } as unknown as NewsService);
     const response = await app.handle(new Request("http://localhost/news"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.data).toMatchObject({
-      rows: [
-        {
-          id: 1,
-          cardFocalPointX: 20,
-          cardFocalPointY: 80,
-          thumbnailFocalPointX: null,
-          thumbnailFocalPointY: null,
-        },
-      ],
-      totalRecords: 1,
+    expect(body.data.rows[0]).toMatchObject({
+      category: { code: "ANNOUNCEMENT" },
+      images: [{ imageType: "THUMBNAIL", focalPointX: 40, focalPointY: 60 }],
+      cardFocalPointX: 25,
     });
   });
 
-  test("GET /news/:id returns news without focal points", async () => {
-    const app = createApp({
-      getNewsById: async () => newsFixture(),
-    } as NewsService);
-
-    const response = await app.handle(new Request("http://localhost/news/1"));
+  test("returns a news item with an empty detail gallery", async () => {
+    const result: NewsWithAdditionalImageDTO = { ...newsFixture(), newsAdditionalImages: [] };
+    const app = createApp({ getNewsById: async () => result } as unknown as NewsService);
+    const response = await app.handle(new Request("http://localhost/news/7"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.data).toMatchObject({
-      id: 1,
-      cardFocalPointX: null,
-      cardFocalPointY: null,
-      thumbnailFocalPointX: null,
-      thumbnailFocalPointY: null,
-    });
+    expect(body.data).toMatchObject({ id: 7, newsAdditionalImages: [], category: { id: 3 } });
+  });
+
+  test("returns only bulletins of the requested type", async () => {
+    const app = createApp({
+      getNewsBulletins: async (type: "HIGHLIGHT" | "ANNOUNCEMENT") => [
+        { id: 3, newsID: 7, type, news: newsFixture() },
+      ],
+    } as unknown as NewsService);
+    const response = await app.handle(new Request("http://localhost/news/bulletins?type=HIGHLIGHT"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data).toMatchObject([{ type: "HIGHLIGHT", news: { category: { code: "ANNOUNCEMENT" } } }]);
   });
 });
