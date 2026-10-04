@@ -33,6 +33,6 @@ The deployment Compose files pin RustFS `1.0.0`, keep its data in a named volume
 
 Create the bucket and read-only policy with `npm run media:bootstrap-rustfs` using the RustFS administrator credentials. Then create a separate application identity with only profile-prefix `s3:PutObject` and `s3:DeleteObject` access and save its key in the deployment environment. Keep `PROFILE_MEDIA_PROVIDER=supabase` through schema deployment and backfill. Promote a portal build containing both staging and production origins, verify its media path, then change the core service to `rustfs`.
 
-Set the portal GitHub variable `MEDIA_PUBLIC_ORIGINS` to the comma-separated HTTPS origins that serve the portal (staging and `https://acs.kmutt.ac.th`). The Docker build allowlists only `/media/acs-media/public/profiles/**` on those hosts.
+The portal displays original image URLs directly in the browser, so image hosts do not need to be added to a portal build-time domain list. The RustFS proxy still limits reads to the approved public media paths.
 
 Back up the database and the `acs-profile-media-*` volume before enabling RustFS in production. Restoring the previous portal and setting `PROFILE_MEDIA_PROVIDER=supabase` leaves both old and RustFS-backed profile URLs readable because each URL is persisted with its media record.

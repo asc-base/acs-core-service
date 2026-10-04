@@ -5,6 +5,7 @@ export interface Config {
   BUCKET_NAME: string;
   PROFILE_MEDIA_PROVIDER: string;
   NEWS_MEDIA_PROVIDER: string;
+  MEDIA_PROVIDER: string;
   RUSTFS_ENDPOINT: string | null;
   RUSTFS_REGION: string;
   RUSTFS_ACCESS_KEY_ID: string | null;
@@ -28,6 +29,7 @@ export const config: Config = {
   BUCKET_NAME: String(process.env.SUPABASE_BUCKET),
   PROFILE_MEDIA_PROVIDER: process.env.PROFILE_MEDIA_PROVIDER || "rustfs",
   NEWS_MEDIA_PROVIDER: process.env.NEWS_MEDIA_PROVIDER || "rustfs",
+  MEDIA_PROVIDER: process.env.MEDIA_PROVIDER || "rustfs",
   RUSTFS_ENDPOINT: process.env.RUSTFS_ENDPOINT || null,
   RUSTFS_REGION: process.env.RUSTFS_REGION || "us-east-1",
   RUSTFS_ACCESS_KEY_ID: process.env.RUSTFS_ACCESS_KEY_ID || null,

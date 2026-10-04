@@ -84,6 +84,10 @@ model ImageMedia {
   deletedAt   DateTime? @map("deleted_at")
   users       User[]
   newsImages  NewsImage[]
+  projects    Project[]
+  projectImages ProjectImage[]
+  curriculums Curriculum[]
+  classBooks  ClassBook[]
 
   @@unique([provider, bucket, fileKey])
   @@map("image_media")
@@ -312,6 +316,7 @@ model Curriculum {
   documentURL  String      @map("document_url")
   description  String      @map("description")
   thumbnailURL String      @map("thumbnail_url")
+  imageID      Int?        @map("image_id")
   thumbnailFocalPointX Float? @map("thumbnail_focal_point_x")
   thumbnailFocalPointY Float? @map("thumbnail_focal_point_y")
   createdAt    DateTime    @default(now()) @map("created_at")
@@ -319,6 +324,7 @@ model Curriculum {
   deletedAt    DateTime?   @map("deleted_at")
   courses      Course[]
   classBooks   ClassBook[]
+  imageMedia   ImageMedia? @relation(fields: [imageID], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@map("curriculums")
   @@schema("public")
@@ -331,6 +337,7 @@ model Professor {
   phone              String    @map("phone")
   expertFields       String?   @map("expert_fields")
   educations         String?   @map("educations")
+  researchProfile    String?   @map("research_profile")
   createdAt          DateTime  @default(now()) @map("created_at")
   deletedAt          DateTime? @map("deleted_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
@@ -396,6 +403,7 @@ model ClassBook {
   classof           String     @unique @map("classof")
   firstYearAcademic String     @map("first_year_academic")
   thumbnailURL      String     @map("thumbnail_url")
+  imageID           Int?       @map("image_id")
   imageFocalPointX  Float?     @map("image_focal_point_x")
   imageFocalPointY  Float?     @map("image_focal_point_y")
   curriculumID      Int        @map("curriculum_id")
@@ -404,6 +412,7 @@ model ClassBook {
   deletedAt         DateTime?  @map("deleted_at")
   curriculum        Curriculum @relation(fields: [curriculumID], references: [id])
   students          Student[]
+  imageMedia        ImageMedia? @relation(fields: [imageID], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@map("class_books")
   @@schema("public")
@@ -456,6 +465,7 @@ model Project {
   id              Int             @id @default(autoincrement()) @map("id")
   title           String          @map("title")
   thumbnailURL    String          @map("thumbnail_url")
+  imageID         Int?            @map("image_id")
   thumbnailFocalPointX Float?     @map("thumbnail_focal_point_x")
   thumbnailFocalPointY Float?     @map("thumbnail_focal_point_y")
   assetsURL       String          @map("assets_url")
@@ -472,8 +482,27 @@ model Project {
   projectTags     ProjectTag[]
   projectMembers  ProjectMember[]
   projectCourses  ProjectCourse[]
+  imageMedia      ImageMedia?     @relation(fields: [imageID], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  images          ProjectImage[]
 
   @@map("projects")
+  @@schema("public")
+}
+
+model ProjectImage {
+  id        Int        @id @default(autoincrement()) @map("id")
+  projectID Int        @map("project_id")
+  imageID   Int        @map("image_id")
+  sortOrder Int        @default(0) @map("sort_order")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  deletedAt DateTime?  @map("deleted_at")
+  project   Project    @relation(fields: [projectID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  image     ImageMedia @relation(fields: [imageID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([projectID, sortOrder])
+  @@index([imageID])
+  @@map("project_images")
   @@schema("public")
 }
 

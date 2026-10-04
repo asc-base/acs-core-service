@@ -1,17 +1,8 @@
+/* eslint-disable no-console */
 import { prisma } from "../src/lib/db";
+import { syncNewsCategories } from "../src/infrastructure/sync-news-categories";
 
-const mode = process.argv[2];
-if (mode !== "--dry-run" && mode !== "--apply") {
-  throw new Error("Choose --dry-run or --apply");
-}
-
-const categoryCodes: Record<string, string> = {
-  ข่าวประชาสัมพันธ์: "ANNOUNCEMENT",
-  ความสำเร็จนักศึกษา: "STUDENT_ACHIEVEMENT",
-  งานกิจกรรมนักศึกษา: "STUDENT_ACTIVITY",
-};
-
-try {
+export async function backfillNewsMedia(mode: "--dry-run" | "--apply") {
   const [news, newsTags] = await Promise.all([
     prisma.news.findMany({
       include: {
@@ -39,21 +30,12 @@ try {
   console.log(`${news.length} news, ${newsTags.length} categories, ${warnings.length} warning(s)`);
   warnings.forEach((warning) => console.warn(`WARN ${warning}`));
   if (mode !== "--dry-run") {
+  await syncNewsCategories(prisma, newsTags);
 
   const bulletinByFeatureName: Record<string, "HIGHLIGHT" | "ANNOUNCEMENT"> = {
     newshighlight: "HIGHLIGHT",
     announcement: "ANNOUNCEMENT",
   };
-  for (const tag of newsTags) {
-    const code = categoryCodes[tag.name] ?? `LEGACY_TAG_${tag.id}`;
-    await prisma.newsCategory.upsert({
-      where: { id: tag.id },
-      create: { id: tag.id, code, name: tag.name },
-      update: { code, name: tag.name },
-    });
-  }
-  await prisma.$executeRaw`SELECT setval(pg_get_serial_sequence('public.news_categories', 'id'), GREATEST(COALESCE((SELECT MAX(id) FROM public.news_categories), 1), 1))`;
-
   for (const item of news) {
     await prisma.$transaction(async (tx) => {
       const category = newsTags.find((tag) => tag.id === item.tagID);
@@ -83,12 +65,16 @@ try {
         focalPointX: number | null = null,
         focalPointY: number | null = null,
         sortOrder = 0,
+        deletedAt = item.deletedAt,
       ) => {
         const image = await ensureImage(url);
-        await tx.newsImage.upsert({
-          where: { newsID_imageID_imageType: { newsID: item.id, imageID: image.id, imageType } },
-          create: { newsID: item.id, imageID: image.id, imageType, focalPointX, focalPointY, sortOrder, deletedAt: item.deletedAt },
-          update: { deletedAt: item.deletedAt, focalPointX, focalPointY, sortOrder },
+        const key = { newsID_imageID_imageType: { newsID: item.id, imageID: image.id, imageType } };
+        if (await tx.newsImage.findUnique({ where: key })) return;
+        if (imageType !== "DETAIL" && await tx.newsImage.findFirst({
+          where: { newsID: item.id, imageType, deletedAt: null },
+        })) return;
+        await tx.newsImage.create({
+          data: { newsID: item.id, imageID: image.id, imageType, focalPointX, focalPointY, sortOrder, deletedAt },
         });
       };
 
@@ -104,8 +90,8 @@ try {
         await addLink(item.thumbnail, "DETAIL", item.thumbnailFocalPointX, item.thumbnailFocalPointY);
       }
       let order = 0;
-      for (const image of item.newsAdditionalImages.filter((entry) => !entry.deletedAt)) {
-        await addLink(image.imageUrl, "DETAIL", null, null, order++);
+      for (const image of item.newsAdditionalImages) {
+        await addLink(image.imageUrl, "DETAIL", null, null, order++, image.deletedAt ?? item.deletedAt);
       }
 
       for (const feature of activeFeatures) {
@@ -124,6 +110,14 @@ try {
   }
   console.log(`Backfilled ${news.length} news item(s)`);
   }
-} finally {
-  await prisma.$disconnect();
+}
+
+if (process.argv[1]?.endsWith("backfill-news-media.ts")) {
+  const mode = process.argv[2];
+  if (mode !== "--dry-run" && mode !== "--apply") throw new Error("Choose --dry-run or --apply");
+  try {
+    await backfillNewsMedia(mode);
+  } finally {
+    await prisma.$disconnect();
+  }
 }

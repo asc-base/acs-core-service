@@ -15,6 +15,7 @@ export class ProfessorFactory implements IProfessorFactory {
       prefix: professor.user.prefix,
       user: this.userFactory.mapUserToDTO(professor.user),
       phone: professor.phone,
+      research_profile: professor.researchProfile ?? null,
       expertFields: professor.expertFields
         ? professor.expertFields?.split("/").map((field) => field.trim()).filter((field) => field.length > 0)
         : [],

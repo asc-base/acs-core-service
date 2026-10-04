@@ -139,6 +139,7 @@ Table public.professors {
   phone varchar(20) [not null]
   expert_fields text [note: 'Legacy field']
   educations text [note: 'Legacy field']
+  research_profile text
 
   created_at timestamp [not null]
   updated_at timestamp
@@ -442,6 +443,7 @@ Table public.projects {
 
   // Legacy denormalized fields retained during project migration.
   thumbnail_url text [not null]
+  image_id int [ref: > image_media.id]
   thumbnail_focal_point_x float
   thumbnail_focal_point_y float
   tech_stacks text [not null]
@@ -604,8 +606,7 @@ Table public.project_images {
 
   project_id int [ref: > projects.id, not null]
   image_id int [ref: > image_media.id, not null]
-
-  image_type project_image_type [not null]
+  sort_order int [not null, default: 0]
 
   created_at timestamp [not null]
   updated_at timestamp
@@ -614,6 +615,7 @@ Table public.project_images {
   indexes {
     project_id
     image_id
+    (project_id, sort_order) [unique]
   }
 }
 

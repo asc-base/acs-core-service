@@ -4,6 +4,8 @@ import {
   CurriculumSchema,
   CurriculumDTO,
 } from "../../curriculums/domain/curriculum";
+import type { StoredImageMedia } from "../../users/domain/image-media";
+import { ImageMediaSchema } from "../../users/domain/image-media";
 
 export const CommonClassBookFields = {
   classof: t.String(),
@@ -20,6 +22,8 @@ export const ClassBookSchema = t.Intersect([
     id: t.Number(),
     ...CommonClassBookFields,
     thumbnailURL: t.String(),
+    thumbnailContentType: t.Optional(t.Nullable(t.String())),
+    imageMedia: t.Optional(t.Nullable(ImageMediaSchema)),
     ...FocalPointFields,
     curriculumID: t.Number(),
     curriculum: CurriculumSchema,
@@ -45,6 +49,7 @@ export const ClassBookDTO = t.Object({
   id: t.Number(),
   ...CommonClassBookFields,
   thumbnailURL: t.String(),
+  thumbnailContentType: t.Optional(t.Nullable(t.String())),
   ...FocalPointFields,
   curriculumID: t.Number(),
   curriculum: CurriculumDTO,
@@ -82,5 +87,5 @@ export type ClassBookDTO = Static<typeof ClassBookDTO>;
 export type CreateClassBookDTO = Static<typeof CreateClassBookDTO>;
 export type ClassBookQueryParams = Static<typeof ClassBookQueryParams>;
 export type UpdateClassBookDTO = Static<typeof UpdateClassBookDTO>;
-export type ClassBookCreatePayload = Static<typeof ClassBookCreatePayloadSchema>;
-export type ClassBookUpdatePayload = Static<typeof ClassBookUpdatePayloadSchema>;
+export type ClassBookCreatePayload = Static<typeof ClassBookCreatePayloadSchema> & { thumbnailMedia?: StoredImageMedia };
+export type ClassBookUpdatePayload = Static<typeof ClassBookUpdatePayloadSchema> & { thumbnailMedia?: StoredImageMedia };

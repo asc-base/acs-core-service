@@ -8,7 +8,8 @@ import {
   ClassBookUpdatePayload,
 } from "./domain/class-book";
 import { IClassBookRepository } from "./domain/class-book.repository";
-import { SupabaseService } from "../../core/utils/supabase";
+import { ProfileImageStorage, StoredImage } from "../../infrastructure/profile-image-storage";
+import { detectImageContentType } from "../users/image-file-validation";
 import { AppError } from "../../core/error/app-error";
 import { ErrorCode } from "../../core/types/errors";
 import { PageableType } from "../../core/models";
@@ -27,13 +28,13 @@ export class ClassBookService implements IClassBookService {
   constructor(
     private readonly classBookRepository: IClassBookRepository,
     private readonly classBookFactory: IClassBookFactory,
-    private readonly storage: SupabaseService,
+    private readonly storage: ProfileImageStorage,
   ) { }
 
   async createClassBook(data: CreateClassBookDTO): Promise<ClassBookDTO> {
     const { thumbnailFile, ...rest } = data;
+    let thumbnailMedia: StoredImage | undefined;
     try {
-      let thumbnailPath: string | null = null;
       if (!thumbnailFile) {
         throw new AppError(
           ErrorCode.VALIDATION_ERROR,
@@ -42,20 +43,20 @@ export class ClassBookService implements IClassBookService {
         );
       }
 
-      thumbnailPath = await this.storage.uploadFile(
-        thumbnailFile,
-        "class-books",
-      );
+      const contentType = await detectImageContentType(thumbnailFile);
+      thumbnailMedia = await this.storage.upload(thumbnailFile, contentType, "class-books/images");
 
       const classBookData = {
         ...rest,
-        thumbnailURL: thumbnailPath,
+        thumbnailURL: thumbnailMedia.imageUrl,
+        thumbnailMedia: { ...thumbnailMedia, fileName: thumbnailFile.name, contentType, fileSize: thumbnailFile.size },
       };
 
       const classBook =
         await this.classBookRepository.createClassBook(classBookData);
       return this.classBookFactory.mapClassBookToDTO(classBook);
     } catch (error) {
+      if (thumbnailMedia) await this.storage.delete(thumbnailMedia.bucket, thumbnailMedia.fileKey).catch(() => {});
       console.log(error);
       throw error;
     }
@@ -94,16 +95,18 @@ export class ClassBookService implements IClassBookService {
       imageFocalPointY,
 
     } = data;
-    let thumbnailPath: string | undefined = undefined;
+    let thumbnailMedia: StoredImage | undefined;
+    let contentType: string | undefined;
     let classBook: ClassBook;
     try {
 
       if (thumbnailFile) {
-        thumbnailPath = await this.storage.uploadFile(thumbnailFile, "class-books");
+        contentType = await detectImageContentType(thumbnailFile);
+        thumbnailMedia = await this.storage.upload(thumbnailFile, contentType, "class-books/images");
       }
 
       const updateClassBookData: ClassBookUpdatePayload = {
-        ...(thumbnailPath && { thumbnailURL: thumbnailPath }),
+        ...(thumbnailMedia && { thumbnailURL: thumbnailMedia.imageUrl, thumbnailMedia: { ...thumbnailMedia, fileName: thumbnailFile!.name, contentType: contentType!, fileSize: thumbnailFile!.size } }),
         classof,
         firstYearAcademic,
         curriculumID,
@@ -114,6 +117,7 @@ export class ClassBookService implements IClassBookService {
       classBook = await this.classBookRepository.updateClassBook(classBookID, updateClassBookData);
       return this.classBookFactory.mapClassBookToDTO(classBook);
     } catch (error) {
+      if (thumbnailMedia) await this.storage.delete(thumbnailMedia.bucket, thumbnailMedia.fileKey).catch(() => {});
       console.log(error);
       throw error;
     }

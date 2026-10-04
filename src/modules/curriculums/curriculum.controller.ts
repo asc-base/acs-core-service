@@ -2,7 +2,7 @@ import { CurriculumService } from "./curriculum.service";
 import { CurriculumRepository } from "../../infrastructure/curriculum.repository";
 import { prisma } from "../../lib/db";
 import { CurriculumFactory } from "./curriculum.factory";
-import { SupabaseService } from "../../core/utils/supabase";
+import { createCentralImageStorage } from "../../infrastructure/profile-image-storage";
 import { Elysia } from "elysia";
 import { HttpStatusCode } from "../../core/types/http";
 import { CurriculumDocs } from "./curriculum.docs";
@@ -13,11 +13,11 @@ import { PERMISSION } from "../../core/permission/permission";
 
 const curriculumRepository = new CurriculumRepository(prisma);
 const curriculumFactory = new CurriculumFactory();
-const supabaseService = new SupabaseService();
+const imageStorage = createCentralImageStorage();
 const curriculumService = new CurriculumService(
   curriculumRepository,
   curriculumFactory,
-  supabaseService,
+  imageStorage,
 );
 
 export const CurriculumController = (app: Elysia) =>

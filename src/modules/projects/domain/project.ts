@@ -4,6 +4,7 @@ import { Tag } from "../../../core/models/tag";
 import { UserSchema } from "../../users/domain/user";
 import { CourseSchema, CourseDTO as CourseDTOSchema } from "../../courses/domain/course";
 import { RoleSchema } from "../../../core/models/role";
+import { ImageMediaSchema, StoredImageMedia } from "../../users/domain/image-media";
 
 const FocalPointInputFields = {
   thumbnailFocalPointX: t.Optional(t.Numeric()),
@@ -13,6 +14,12 @@ const FocalPointResponseFields = {
   thumbnailFocalPointX: t.Optional(t.Nullable(t.Number())),
   thumbnailFocalPointY: t.Optional(t.Nullable(t.Number())),
 };
+
+const ProjectImageDTO = t.Object({
+  imageUrl: t.String(),
+  contentType: t.Nullable(t.String()),
+  sortOrder: t.Number(),
+});
 
 export const CommonProjectFields = {
   title: t.String(),
@@ -30,7 +37,14 @@ export const ProjectSchema = t.Intersect([
     ...CommonProjectFields,
     ...FocalPointResponseFields,
     thumbnailURL: t.String(),
+    thumbnailContentType: t.Optional(t.Nullable(t.String())),
     assetsURL: t.Optional(t.String()),
+    imageID: t.Optional(t.Nullable(t.Number())),
+    imageMedia: t.Optional(t.Nullable(ImageMediaSchema)),
+    images: t.Optional(t.Array(t.Object({
+      sortOrder: t.Number(),
+      image: ImageMediaSchema,
+    }))),
     techStacks: t.String(),
     projectTags: t.Optional(t.Array(t.Object({
       tag: Tag,
@@ -66,9 +80,11 @@ export const ProjectDTO = t.Intersect([
   t.Object({
     id: t.Number(),
     thumbnailURL: t.String(),
+    thumbnailContentType: t.Optional(t.Nullable(t.String())),
     ...CommonProjectFields,
     ...FocalPointResponseFields,
     assetsURL: t.Array(t.String()),
+    images: t.Optional(t.Array(ProjectImageDTO)),
     techStacks: t.Array(t.String()),
     tag: t.Array(Tag),
 
@@ -169,8 +185,14 @@ export type UpdateProjectDTO = Static<typeof UpdateProjectDTO>;
 export type ProjectDTO = Static<typeof ProjectDTO>;
 export type ProjectQueryParams = Static<typeof ProjectQueryParams>;
 
-export type ProjectCreatePayload = Static<typeof ProjectCreatePayloadSchema>;
-export type ProjectUpdatePayload = Static<typeof ProjectUpdatePayloadSchema>;
+export type ProjectCreatePayload = Static<typeof ProjectCreatePayloadSchema> & {
+  thumbnailMedia?: StoredImageMedia;
+  galleryMedia?: Array<StoredImageMedia & { sortOrder: number }>;
+};
+export type ProjectUpdatePayload = Static<typeof ProjectUpdatePayloadSchema> & {
+  thumbnailMedia?: StoredImageMedia;
+  galleryMedia?: Array<StoredImageMedia & { sortOrder: number }>;
+};
 export type ProjectTagPayload = Static<typeof ProjectTagPayloadSchema>;
 export type ProjectMemberPayload = Static<typeof ProjectMemberPayloadSchema>;
 export type ProjectCoursePayload = Static<typeof ProjectCoursePayloadSchema>;

@@ -1,5 +1,7 @@
 import { t, Static } from "elysia";
 import { BaseModelSchema, CommonQueryParams } from "../../../core/models";
+import type { StoredImageMedia } from "../../users/domain/image-media";
+import { ImageMediaSchema } from "../../users/domain/image-media";
 
 const FocalPointInputFields = {
   thumbnailFocalPointX: t.Optional(t.Numeric()),
@@ -22,6 +24,8 @@ export const CurriculumSchema = t.Intersect([
   t.Object({
     id: t.Number(),
     thumbnailURL: t.String(),
+    thumbnailContentType: t.Optional(t.Nullable(t.String())),
+    imageMedia: t.Optional(t.Nullable(ImageMediaSchema)),
     ...CommonCurriculumField,
     ...FocalPointResponseFields,
   }),
@@ -37,6 +41,7 @@ export const CreateCurriculumDTO = t.Object({
 export const CurriculumDTO = t.Object({
   id: t.Number(),
   thumbnailURL: t.String(),
+  thumbnailContentType: t.Optional(t.Nullable(t.String())),
   ...CommonCurriculumField,
   ...FocalPointResponseFields,
 });
@@ -78,8 +83,8 @@ export const CurriculumUpdatePayloadSchema = t.Partial(
   })
 );
 
-export type CurriculumCreatePayload = Static<typeof CurriculumCreatePayloadSchema>;
-export type CurriculumUpdatePayload = Static<typeof CurriculumUpdatePayloadSchema>;
+export type CurriculumCreatePayload = Static<typeof CurriculumCreatePayloadSchema> & { thumbnailMedia?: StoredImageMedia };
+export type CurriculumUpdatePayload = Static<typeof CurriculumUpdatePayloadSchema> & { thumbnailMedia?: StoredImageMedia };
 export type Curriculum = Static<typeof CurriculumSchema>;
 export type CreateCurriculumDTO = Static<typeof CreateCurriculumDTO>;
 export type CurriculumDTO = Static<typeof CurriculumDTO>;

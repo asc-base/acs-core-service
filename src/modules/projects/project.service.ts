@@ -10,7 +10,8 @@ import {
   ProjectMemberPayload,
   ProjectCoursePayload,
 } from "./domain/project";
-import { SupabaseService } from "../../core/utils/supabase";
+import { ProfileImageStorage, StoredImage } from "../../infrastructure/profile-image-storage";
+import { detectImageContentType } from "../users/image-file-validation";
 import { AppError } from "../../core/error/app-error";
 import { ErrorCode } from "../../core/types/errors";
 import { IProjectFactory } from "./project.factory";
@@ -28,7 +29,7 @@ interface IProjectService {
 export class ProjectService implements IProjectService {
   constructor(
     private readonly projectRepository: IProjectRepository,
-    private readonly storageService: SupabaseService,
+    private readonly storageService: ProfileImageStorage,
     private readonly projectFactory: IProjectFactory,
   ) { }
 
@@ -43,6 +44,7 @@ export class ProjectService implements IProjectService {
       ...projectFields
     } = projectData;
 
+    const uploadedMedia: StoredImage[] = [];
     const assetURLs: string[] = [];
 
     if (!thumbnailFile) {
@@ -59,40 +61,35 @@ export class ProjectService implements IProjectService {
       );
     }
 
-    const thumbnailURL = await this.storageService.uploadFile(
-      thumbnailFile,
-      "project-thumbnails",
-    );
-
-    if (!thumbnailURL) {
-      throw new AppError(
-        ErrorCode.DATABASE_ERROR,
-        "Failed to upload thumbnail",
-      );
-    }
-
-    for (const asset of assets) {
-      const assetURL = await this.storageService.uploadFile(
-        asset,
-        "project-assets",
-      );
-      if (!assetURL) {
-        throw new AppError(ErrorCode.DATABASE_ERROR, "Failed to upload asset");
+    const thumbnailContentType = await detectImageContentType(thumbnailFile);
+    let thumbnailMedia: StoredImage;
+    let projectCreated = false;
+    try {
+      thumbnailMedia = await this.storageService.upload(thumbnailFile, thumbnailContentType, "projects/images");
+      uploadedMedia.push(thumbnailMedia);
+      const galleryMedia = [];
+      for (const asset of assets) {
+        const contentType = await detectImageContentType(asset);
+        const media = await this.storageService.upload(asset, contentType, "projects/images");
+        uploadedMedia.push(media);
+        galleryMedia.push({ ...media, fileName: asset.name, contentType, fileSize: asset.size, sortOrder: galleryMedia.length });
+        assetURLs.push(media.imageUrl);
       }
-      assetURLs.push(assetURL);
-    }
 
     const assetsURLString = assetURLs.join(",");
     const techStackString = techStacks.join(",");
 
-    const createPayload: ProjectCreatePayload = {
-      ...projectFields,
-      thumbnailURL: thumbnailURL,
-      assetsURL: assetsURLString,
-      techStacks: techStackString,
-    }
+      const createPayload: ProjectCreatePayload = {
+        ...projectFields,
+        thumbnailURL: thumbnailMedia.imageUrl,
+        thumbnailMedia: { ...thumbnailMedia, fileName: thumbnailFile.name, contentType: thumbnailContentType, fileSize: thumbnailFile.size },
+        galleryMedia,
+        assetsURL: assetsURLString,
+        techStacks: techStackString,
+      };
 
-    const createdProject = await this.projectRepository.createProject(createPayload);
+      const createdProject = await this.projectRepository.createProject(createPayload);
+      projectCreated = true;
 
     const projectTagsData: ProjectTagPayload[] = Array.from(new Set(tagsID)).map((tagID) => ({
       projectID: createdProject.id,
@@ -110,13 +107,17 @@ export class ProjectService implements IProjectService {
       courseID,
     }));
 
-    await this.projectRepository.createProjectMember(projectMembersData);
+      await this.projectRepository.createProjectMember(projectMembersData);
 
-    await this.projectRepository.createProjectTag(projectTagsData);
+      await this.projectRepository.createProjectTag(projectTagsData);
 
-    await this.projectRepository.createProjectCourse(projectCourseData);
+      await this.projectRepository.createProjectCourse(projectCourseData);
 
-    return this.projectFactory.mapProjectToDTO(createdProject);
+      return this.projectFactory.mapProjectToDTO(createdProject);
+    } catch (error) {
+      if (!projectCreated) await Promise.all(uploadedMedia.map((media) => this.storageService.delete(media.bucket, media.fileKey).catch(() => {})));
+      throw error;
+    }
   }
 
   async getProject(query: ProjectQueryParams): Promise<PageableType<typeof ProjectDTO>> {
@@ -166,33 +167,33 @@ export class ProjectService implements IProjectService {
       throw new AppError(ErrorCode.NOT_FOUND, "Project not found");
     }
 
-    let thumbnailURL = existingProject.thumbnailURL;
+    const uploadedMedia: StoredImage[] = [];
+    let mediaCommitted = false;
+    let updatedProject: Awaited<ReturnType<IProjectRepository["updateProject"]>>;
+    try {
+    let thumbnailURL = existingProject.imageMedia?.imageUrl ?? existingProject.thumbnailURL;
+    let thumbnailMedia: StoredImage | undefined;
+    let thumbnailContentType: string | undefined;
 
     if (thumbnailFile) {
-      const uploaded = await this.storageService.uploadFile(
-        thumbnailFile,
-        "project-thumbnails"
-      );
-      if (!uploaded) {
-        throw new AppError(ErrorCode.DATABASE_ERROR, "Failed to upload thumbnail");
-      }
-      thumbnailURL = uploaded;
+      thumbnailContentType = await detectImageContentType(thumbnailFile);
+      thumbnailMedia = await this.storageService.upload(thumbnailFile, thumbnailContentType, "projects/images");
+      uploadedMedia.push(thumbnailMedia);
+      thumbnailURL = thumbnailMedia.imageUrl;
     }
 
-    let assetURLs: string[] = existingProject.assetsURL
-      ? existingProject.assetsURL.split(",")
+    const assetURLs: string[] = existingProject.assetsURL
+      ? existingProject.assetsURL.split(",").filter(Boolean)
       : [];
 
+    const galleryMedia = [];
     if (assets && assets.length > 0) {
       for (const asset of assets) {
-        const uploaded = await this.storageService.uploadFile(
-          asset,
-          "project-assets"
-        );
-        if (!uploaded) {
-          throw new AppError(ErrorCode.DATABASE_ERROR, "Failed to upload asset");
-        }
-        assetURLs.push(uploaded);
+        const contentType = await detectImageContentType(asset);
+        const uploaded = await this.storageService.upload(asset, contentType, "projects/images");
+        uploadedMedia.push(uploaded);
+        galleryMedia.push({ ...uploaded, fileName: asset.name, contentType, fileSize: asset.size, sortOrder: assetURLs.length });
+        assetURLs.push(uploaded.imageUrl);
       }
     }
 
@@ -206,10 +207,17 @@ export class ProjectService implements IProjectService {
       ...projectFields,
       thumbnailURL,
       assetsURL: assetsURLString,
+      ...(thumbnailMedia && { thumbnailMedia: { ...thumbnailMedia, fileName: thumbnailFile!.name, contentType: thumbnailContentType!, fileSize: thumbnailFile!.size } }),
+      ...(galleryMedia.length && { galleryMedia }),
       techStacks: techStackString,
       updatedAt: new Date(),
     }
-    const updatedProject = await this.projectRepository.updateProject(id, updatedData);
+      updatedProject = await this.projectRepository.updateProject(id, updatedData);
+      mediaCommitted = true;
+    } catch (error) {
+      if (!mediaCommitted) await Promise.all(uploadedMedia.map((media) => this.storageService.delete(media.bucket, media.fileKey).catch(() => {})));
+      throw error;
+    }
 
     if (newtagsID.length > 0) {
       const data = Array.from(new Set(newtagsID)).map((tagID) => ({

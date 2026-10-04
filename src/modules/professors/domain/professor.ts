@@ -18,6 +18,7 @@ export const ProfessorSchema = t.Intersect([
     userID: t.Number(),
     expertFields: t.Optional(t.Nullable(t.String())),
     educations: t.Optional(t.Nullable(t.String())),
+    researchProfile: t.Optional(t.Nullable(t.String())),
     ...CommonProfessorFields,
     user: UserSchema,
   }),
@@ -49,6 +50,7 @@ export const CreateProfessorDTO = t.Object({
       }),
     ),
   ),
+  research_profile: t.Optional(t.Nullable(t.String())),
 });
 
 export const ProfessorDTO = t.Object({
@@ -56,6 +58,7 @@ export const ProfessorDTO = t.Object({
   ...CommonProfessorFields,
   expertFields: t.Array(t.String()),
   educations: t.Array(t.String()),
+  research_profile: t.Nullable(t.String()),
   prefix: t.Optional(t.Nullable(PrefixSchema)),
   user: UserSchema,
 });
@@ -88,6 +91,7 @@ export const ProfessorUpdateDTO = t.Partial(
         }),
       ),
     ),
+    research_profile: t.Optional(t.Nullable(t.String())),
   }),
 );
 
@@ -96,6 +100,7 @@ export const ProfessorCreatePayloadSchema = t.Object({
   profRoom: t.String(),
   expertFields: t.Optional(t.Nullable(t.String())),
   educations: t.Optional(t.Nullable(t.String())),
+  researchProfile: t.Optional(t.Nullable(t.String())),
   userID: t.Number(),
 });
 
@@ -105,6 +110,7 @@ export const ProfessorUpdatePayloadSchema = t.Partial(
     profRoom: t.String(),
     expertFields: t.Optional(t.Nullable(t.String())),
     educations: t.Optional(t.Nullable(t.String())),
+    researchProfile: t.Optional(t.Nullable(t.String())),
     deletedAt: t.Optional(t.Nullable(t.Date())),
   }),
 );

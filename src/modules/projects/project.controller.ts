@@ -1,7 +1,7 @@
 import { ProjectRepository } from "../../infrastructure/project.repository";
 import { ProjectService } from "./project.service";
 import { prisma } from "../../lib/db";
-import { SupabaseService } from "../../core/utils/supabase";
+import { createCentralImageStorage } from "../../infrastructure/profile-image-storage";
 import { ProjectFactory } from "./project.factory";
 import Elysia from "elysia";
 import { ProjectDocs } from "./project.docs";
@@ -14,13 +14,13 @@ import { authMiddleware } from "../../middleware/auth";
 import { PERMISSION } from "../../core/permission/permission";
 
 const projectRepository = new ProjectRepository(prisma);
-const supabaseService = new SupabaseService();
+const imageStorage = createCentralImageStorage();
 const userFactory = new UserFactory();
 const courseFactory = new CourseFactory();
 const projectFactory = new ProjectFactory(userFactory, courseFactory);
 const projectService = new ProjectService(
   projectRepository,
-  supabaseService,
+  imageStorage,
   projectFactory,
 );
 

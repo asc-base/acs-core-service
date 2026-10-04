@@ -27,7 +27,7 @@ services:
     container_name: acs-core-services
     build:
       context: .
-      dockerfile: dockerfile
+      dockerfile: Dockerfile
       target: local
     environment:
       SUPABASE_URL: ${SUPABASE_URL}

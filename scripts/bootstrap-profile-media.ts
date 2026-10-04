@@ -38,7 +38,7 @@ try {
       Bucket: bucket,
       Policy: JSON.stringify({
         Version: "2012-10-17",
-        Statement: ["profiles", "news"].map((folder) => ({
+        Statement: ["profiles", "news", "projects", "curriculums", "class-books", "images"].map((folder) => ({
             Sid: `PublicRead${folder}`,
             Effect: "Allow",
             Principal: "*",
@@ -48,7 +48,7 @@ try {
       }),
     }),
   );
-  console.log(`Bucket ${bucket} is ready with profile and news public reads`);
+  console.log(`Bucket ${bucket} is ready with public image reads`);
 } finally {
   client.destroy();
 }

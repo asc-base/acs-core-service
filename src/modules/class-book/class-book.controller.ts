@@ -3,7 +3,7 @@ import { prisma } from "../../lib/db";
 import { ClassBookRepository } from "../../infrastructure/class-book.repository";
 import { ClassBookService } from "./class-book.service";
 import { ClassBookFactory } from "./class-book.factory";
-import { SupabaseService } from "../../core/utils/supabase";
+import { createCentralImageStorage } from "../../infrastructure/profile-image-storage";
 import { success } from "../../core/interceptor/response";
 import { HttpStatusCode } from "../../core/types/http";
 import { ClassBookDocs } from "./class-book.docs";
@@ -13,13 +13,13 @@ import { roleMacro } from "../../middleware/checkRole";
 import { PERMISSION } from "../../core/permission/permission";
 
 const curriculumFactory = new CurriculumFactory();
-const supabaseService = new SupabaseService();
+const imageStorage = createCentralImageStorage();
 const classBookRepository = new ClassBookRepository(prisma);
 const classBookFactory = new ClassBookFactory(curriculumFactory);
 const classBookService = new ClassBookService(
   classBookRepository,
   classBookFactory,
-  supabaseService,
+  imageStorage,
 );
 
 

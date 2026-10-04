@@ -2,11 +2,7 @@ import { t, type Static } from "elysia";
 
 export const ImageMediaSchema = t.Object({
   id: t.Number(),
-  provider: t.Union([
-    t.Literal("rustfs"),
-    t.Literal("supabase"),
-    t.Literal("legacy_url"),
-  ]),
+  provider: t.String(),
   bucket: t.Optional(t.Nullable(t.String())),
   fileKey: t.Optional(t.Nullable(t.String())),
   imageUrl: t.String(),
@@ -17,3 +13,8 @@ export const ImageMediaSchema = t.Object({
 
 export type ImageMedia = Static<typeof ImageMediaSchema>;
 export type ImageMediaCreate = Omit<ImageMedia, "id">;
+export type StoredImageMedia = Pick<ImageMediaCreate, "provider" | "bucket" | "fileKey" | "imageUrl"> & {
+  fileName?: string | null;
+  contentType?: string | null;
+  fileSize?: number | null;
+};

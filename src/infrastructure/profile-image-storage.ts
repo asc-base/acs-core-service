@@ -136,6 +136,9 @@ export function createImageStorage(provider: string): ProfileImageStorage {
 export const createProfileImageStorage = () =>
   createImageStorage(config.PROFILE_MEDIA_PROVIDER);
 
+export const createCentralImageStorage = () =>
+  createImageStorage(config.MEDIA_PROVIDER);
+
 export function createNewsImageStorage(): ProfileImageStorage {
   let storage: ProfileImageStorage | undefined;
   const getStorage = () => (storage ??= createImageStorage(config.NEWS_MEDIA_PROVIDER));

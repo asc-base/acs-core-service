@@ -18,6 +18,31 @@ import { PageableType } from "../../core/models";
 import { IUnitOfWork } from "../../core/uow/uow.interface";
 import { ProfileImageStorage, StoredImage } from "../../infrastructure/profile-image-storage";
 import { validateProfileImage } from "../users/profile-image-validation";
+
+export function normalizeResearchProfileURL(value: string | null | undefined) {
+  if (value == null) return value;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  try {
+    const url = new URL(normalized);
+    if (
+      /^https?:\/\//i.test(normalized) &&
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      url.hostname
+    ) {
+      return normalized;
+    }
+  } catch {
+    // Fall through to the validation error below.
+  }
+
+  throw new AppError(
+    ErrorCode.VALIDATION_ERROR,
+    "Research profile must be a full HTTP or HTTPS URL",
+    400,
+  );
+}
+
 interface IProfessorService {
   createProfessor(
     data: CreateProfessorDTO,
@@ -54,8 +79,10 @@ export class ProfessorService implements IProfessorService {
       imageFocalPointX,
       imageFocalPointY,
       prefixID,
+      research_profile,
       ...rawProfessorData
     } = data;
+    const researchProfile = normalizeResearchProfileURL(research_profile);
     let storedImage: StoredImage | null = null;
     try {
       const existingUser = await this.userRepository.getUserByEmail(email);
@@ -125,11 +152,13 @@ export class ProfessorService implements IProfessorService {
         if (existingProfessor) {
           professor = await tx.professor.updateProfessor(existingProfessor.id, {
             ...rawProfessorData,
+            researchProfile,
             deletedAt: null,
           });
         } else {
           const professorData: ProfessorCreatePayload = {
             ...rawProfessorData,
+            researchProfile: researchProfile ?? null,
             userID: user.id,
           };
           professor = await tx.professor.createProfessor(professorData);
@@ -201,6 +230,7 @@ export class ProfessorService implements IProfessorService {
       profRoom,
       educations,
       expertFields,
+      research_profile,
       ...UserData
     } = data;
     const existing = await this.professorRepository.getProfessorById(professorID);
@@ -219,6 +249,9 @@ export class ProfessorService implements IProfessorService {
         profRoom,
         educations,
         expertFields,
+        ...(research_profile !== undefined && {
+          researchProfile: normalizeResearchProfileURL(research_profile),
+        }),
       };
 
       const professor = await this.unitOfWork.runInTransaction(async (tx) => {

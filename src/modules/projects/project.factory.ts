@@ -14,7 +14,8 @@ export class ProjectFactory implements IProjectFactory {
   mapProjectToDTO(project: Project): ProjectDTO {
     return {
       id: project.id,
-      thumbnailURL: project.thumbnailURL,
+      thumbnailURL: project.imageMedia?.imageUrl ?? project.thumbnailURL,
+      thumbnailContentType: project.imageMedia?.contentType ?? null,
       title: project.title,
       thumbnailFocalPointX: project.thumbnailFocalPointX,
       thumbnailFocalPointY: project.thumbnailFocalPointY,
@@ -25,6 +26,11 @@ export class ProjectFactory implements IProjectFactory {
       figmaURL: project.figmaURL,
       youtubeURL: project.youtubeURL,
       assetsURL: project.assetsURL ? project.assetsURL.split(",") : [],
+      images: (project.images ?? []).map(({ sortOrder, image }) => ({
+        imageUrl: image.imageUrl,
+        contentType: image.contentType ?? null,
+        sortOrder,
+      })),
       techStacks: project.techStacks ? project.techStacks.split(",") : [],
 
       tag: project.projectTags?.map((projectTag) => ({
