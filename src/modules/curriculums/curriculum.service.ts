@@ -7,19 +7,20 @@ import {
   CurriculumUpdatePayload
 } from "./domain/curriculum";
 import { ICurriculumRepository } from "./domain/curriculum.repository";
-import { SupabaseService } from "../../core/utils/supabase";
+import { ProfileImageStorage, StoredImage } from "../../infrastructure/profile-image-storage";
+import { detectImageContentType } from "../users/image-file-validation";
 import { AppError } from "../../core/error/app-error";
 import { ErrorCode } from "../../core/types/errors";
 import { HttpStatusCode } from "../../core/types/http";
 import { ICurriculumFactory } from "./curriculum.factory";
 import { PageableType } from "../../core/models";
 interface ICurriculumService {
-  createCurriculum(data: CreateCurriculumDTO, userId: number): Promise<CurriculumDTO>;
+  createCurriculum(data: CreateCurriculumDTO): Promise<CurriculumDTO>;
   getCurriculums(
     query: CurriculumQueryParams,
   ): Promise<PageableType<typeof CurriculumDTO>>;
   getCurriculumById(id: number): Promise<CurriculumDTO>;
-  updateCurriculum(id: number, data: UpdateCurriculumDTO, userId: number): Promise<CurriculumDTO>;
+  updateCurriculum(id: number, data: UpdateCurriculumDTO): Promise<CurriculumDTO>;
   deleteCurriculum(id: number): Promise<CurriculumDTO>;
 }
 
@@ -27,13 +28,13 @@ export class CurriculumService implements ICurriculumService {
   constructor(
     private readonly curriculumRepository: ICurriculumRepository,
     private readonly curriculumFactory: ICurriculumFactory,
-    private readonly storageService: SupabaseService,
+    private readonly storageService: ProfileImageStorage,
   ) {}
 
-  async createCurriculum(data: CreateCurriculumDTO, userId: number): Promise<CurriculumDTO> {
+  async createCurriculum(data: CreateCurriculumDTO): Promise<CurriculumDTO> {
     const { thumbnailFile, ...rest } = data;
+    let uploadedThumbnail: StoredImage | undefined;
     try {
-      let uploadedThumbnailPath: string | null = null;
       if (!thumbnailFile) {
         throw new AppError(
           ErrorCode.VALIDATION_ERROR,
@@ -42,16 +43,13 @@ export class CurriculumService implements ICurriculumService {
         );
       }
 
-      uploadedThumbnailPath = await this.storageService.uploadFile(
-        thumbnailFile,
-        "curriculums",
-      );
+      const contentType = await detectImageContentType(thumbnailFile);
+      uploadedThumbnail = await this.storageService.upload(thumbnailFile, contentType, "curriculums/images");
 
       const curriculumData: CurriculumCreatePayload = {
         ...rest,
-        thumbnailURL: uploadedThumbnailPath,
-        createdBy: userId,
-        updatedBy: userId,
+        thumbnailURL: uploadedThumbnail.imageUrl,
+        thumbnailMedia: { ...uploadedThumbnail, fileName: thumbnailFile.name, contentType, fileSize: thumbnailFile.size },
       };
 
       const curriculum =
@@ -59,6 +57,7 @@ export class CurriculumService implements ICurriculumService {
 
       return this.curriculumFactory.mapCurriculumToDTO(curriculum);
     } catch (error) {
+      if (uploadedThumbnail) await this.storageService.delete(uploadedThumbnail.bucket, uploadedThumbnail.fileKey).catch(() => {});
       console.error(error);
       throw error;
     }
@@ -97,7 +96,6 @@ export class CurriculumService implements ICurriculumService {
   async updateCurriculum(
     id: number,
     data: UpdateCurriculumDTO,
-    userId: number
   ): Promise<CurriculumDTO> {
     const existingCurriculum = await this.curriculumRepository.getCurriculumById(id);
     
@@ -110,40 +108,28 @@ export class CurriculumService implements ICurriculumService {
     }
 
     const { thumbnailFile, ...rest } = data;
-    let updatedThumbnailPath = existingCurriculum.thumbnailURL;
+    let updatedThumbnailPath = existingCurriculum.imageMedia?.imageUrl ?? existingCurriculum.thumbnailURL;
+    let uploadedThumbnail: StoredImage | undefined;
+    let uploadedContentType: string | undefined;
 
     try {
       if (thumbnailFile) {
-        updatedThumbnailPath = await this.storageService.uploadFile(
-          thumbnailFile,
-          "curriculums",
-        );
-
-        if (existingCurriculum.thumbnailURL) {
-          try {
-            const urlPattern = /\/public\/[^/]+\/(.+)$/;
-            const match = existingCurriculum.thumbnailURL.match(urlPattern);
-            
-            if (match) {
-              const oldFilePath = decodeURI(match[1]);
-              await this.storageService.deleteFile(oldFilePath);
-            }
-          } catch (deleteError) {
-            console.error("Failed to delete old thumbnail from Supabase:", deleteError);
-          }
-        }
+        uploadedContentType = await detectImageContentType(thumbnailFile);
+        uploadedThumbnail = await this.storageService.upload(thumbnailFile, uploadedContentType, "curriculums/images");
+        updatedThumbnailPath = uploadedThumbnail.imageUrl;
       }
 
       const updatedData: CurriculumUpdatePayload = {
         ...rest,
         thumbnailURL: updatedThumbnailPath,
-        updatedBy: userId, 
+        ...(uploadedThumbnail && { thumbnailMedia: { ...uploadedThumbnail, fileName: thumbnailFile!.name, contentType: uploadedContentType!, fileSize: thumbnailFile!.size } }),
       };
 
       const updatedCurriculum = await this.curriculumRepository.updateCurriculum(id, updatedData);
 
       return this.curriculumFactory.mapCurriculumToDTO(updatedCurriculum);
     } catch (error) {
+      if (uploadedThumbnail) await this.storageService.delete(uploadedThumbnail.bucket, uploadedThumbnail.fileKey).catch(() => {});
       console.error(error);
       throw error;
     }

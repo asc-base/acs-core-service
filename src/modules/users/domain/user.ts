@@ -1,8 +1,16 @@
 import { BaseModelSchema } from "../../../core/models";
 import { Static, t } from "elysia";
 import { RoleSchema } from "../../../core/models/role";
+import { PrefixSchema } from "../../../core/models/prefix";
+import { ImageMediaSchema } from "./image-media";
+
+export const FocalPointInputFields = {
+  imageFocalPointX: t.Optional(t.Numeric()),
+  imageFocalPointY: t.Optional(t.Numeric()),
+};
 
 export const CommonUserFields = {
+  prefixID: t.Optional(t.Nullable(t.Numeric())),
   firstNameTh: t.String({
     minLength: 1,
   }),
@@ -58,8 +66,12 @@ export const UserSchema = t.Intersect([
   t.Object({
     id: t.Number(),
     ...CommonUserFields,
-    password: t.Optional(t.Nullable(t.String())),
     imageUrl: t.Optional(t.Nullable(t.String())),
+    imageID: t.Optional(t.Nullable(t.Number())),
+    imageMedia: t.Optional(t.Nullable(t.Pick(ImageMediaSchema, ["provider", "imageUrl"]))),
+    imageFocalPointX: t.Optional(t.Nullable(t.Number())),
+    imageFocalPointY: t.Optional(t.Nullable(t.Number())),
+    prefix: t.Optional(t.Nullable(PrefixSchema)),
     userRoles: t.Optional(t.Array(UserRoleSchema)),
   }),
   BaseModelSchema,
@@ -67,32 +79,39 @@ export const UserSchema = t.Intersect([
 
 export const CreateUserModel = t.Object({
   ...CommonUserFields,
-  password: t.Optional(t.Nullable(t.String())),
+  imageID: t.Optional(t.Nullable(t.Number())),
   imageUrl: t.Optional(t.Nullable(t.String())),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
+  imageFocalPointX: t.Optional(t.Nullable(t.Number())),
+  imageFocalPointY: t.Optional(t.Nullable(t.Number())),
 });
 
 export const CreateUserRoleModel = t.Object({
   userID: t.Number(),
   roleID: t.Number(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const UpdateUserModel = t.Partial(
   t.Object({
     ...CommonUserFields,
-    password: t.Optional(t.Nullable(t.String())),
+    imageID: t.Optional(t.Nullable(t.Number())),
     imageUrl: t.Optional(t.Nullable(t.String())),
-    updatedBy: t.Number(),
+    imageFocalPointX: t.Optional(t.Nullable(t.Number())),
+    imageFocalPointY: t.Optional(t.Nullable(t.Number())),
   }),
 );
 
 export const UserDTO = t.Object({
   id: t.Number(),
   ...CommonUserFields,
+  prefix: t.Optional(t.Nullable(PrefixSchema)),
   imageUrl: t.Optional(t.Nullable(t.String())),
+  imageFocalPointX: t.Optional(t.Nullable(t.Number())),
+  imageFocalPointY: t.Optional(t.Nullable(t.Number())),
+});
+
+export const UserProfileDTO = t.Object({
+  ...UserDTO.properties,
+  roles: t.Array(RoleSchema),
 });
 
 export type CreateUserDTO = Static<typeof CreateUserDTO>;
@@ -101,4 +120,5 @@ export type CreateUserModel = Static<typeof CreateUserModel>;
 export type CreateUserRoleModel = Static<typeof CreateUserRoleModel>;
 export type UpdateUserModel = Static<typeof UpdateUserModel>;
 export type UserDTO = Static<typeof UserDTO>;
+export type UserProfileDTO = Static<typeof UserProfileDTO>;
 export type CreateSuperUserDTO = Static<typeof CreateSuperUserDTO>;

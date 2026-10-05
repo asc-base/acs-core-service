@@ -4,17 +4,24 @@ import {
   NewsFeature,
   QueryNewsFeatureParams,
   NewsCreatePayload,
-  NewsFeatureCreatePayload,
+  NewsFeatureUpsertPayload,
   NewsUpdatePayload,
+  NewsWithAdditionalImages,
+  NewsBulletinType,
+  NewsBulletinView,
 } from "./news";
 
 
 export interface INewsRepository {
-  createNews(data: NewsCreatePayload): Promise<News>;
+  createNews(data: NewsCreatePayload): Promise<NewsWithAdditionalImages>;
   getNews(query: NewsQueryParams): Promise<News[]>;
-  getNewsById(id: number): Promise<News | null>;
-  upsertNewsFeature(
-    newsFeatureData: NewsFeatureCreatePayload,
+  getNewsById(id: number): Promise<NewsWithAdditionalImages | null>;
+  createNewsFeature(
+    newsFeatureData: NewsFeatureUpsertPayload,
+  ): Promise<NewsFeature>;
+  updateNewsFeature(
+    id: number,
+    newsFeatureData: NewsFeatureUpsertPayload,
   ): Promise<NewsFeature>;
   getNewsFeaturesBy(query: QueryNewsFeatureParams): Promise<NewsFeature[]>;
   getNewsFeatureById(id: number): Promise<NewsFeature | null>;
@@ -24,5 +31,7 @@ export interface INewsRepository {
   updateNews(
     id: number,
     data: NewsUpdatePayload,
-  ): Promise<News | null>;
+  ): Promise<NewsWithAdditionalImages>;
+  getNewsBulletins(type: NewsBulletinType): Promise<NewsBulletinView[]>;
+  setNewsBulletin(newsID: number, type: NewsBulletinType, enabled: boolean): Promise<NewsBulletinView | null>;
 }

@@ -1,7 +1,7 @@
 import { ProjectRepository } from "../../infrastructure/project.repository";
 import { ProjectService } from "./project.service";
 import { prisma } from "../../lib/db";
-import { SupabaseService } from "../../core/utils/supabase";
+import { createCentralImageStorage } from "../../infrastructure/profile-image-storage";
 import { ProjectFactory } from "./project.factory";
 import Elysia from "elysia";
 import { ProjectDocs } from "./project.docs";
@@ -14,13 +14,13 @@ import { authMiddleware } from "../../middleware/auth";
 import { PERMISSION } from "../../core/permission/permission";
 
 const projectRepository = new ProjectRepository(prisma);
-const supabaseService = new SupabaseService();
+const imageStorage = createCentralImageStorage();
 const userFactory = new UserFactory();
 const courseFactory = new CourseFactory();
 const projectFactory = new ProjectFactory(userFactory, courseFactory);
 const projectService = new ProjectService(
   projectRepository,
-  supabaseService,
+  imageStorage,
   projectFactory,
 );
 
@@ -32,8 +32,8 @@ export const ProjectController = (app: Elysia) =>
     .use(roleMacro)
   .post(
       "",
-      async ({ body, projectService ,userID }) => {
-        const project = await projectService.createProject(userID,body);
+      async ({ body, projectService }) => {
+        const project = await projectService.createProject(body);
         return success(project);
       },
       {
@@ -43,8 +43,8 @@ export const ProjectController = (app: Elysia) =>
     )
   .put(
     "/:id",
-    async ({ body, params, projectService, userID, set }) => {
-        const updatedProject = await projectService.updateProject(params.id, userID, body);
+    async ({ body, params, projectService, set }) => {
+        const updatedProject = await projectService.updateProject(params.id, body);
         set.status = HttpStatusCode.OK;
         return success(updatedProject, "Project updated successfully");
     },
@@ -55,8 +55,8 @@ export const ProjectController = (app: Elysia) =>
   )
    .delete(
     "/:id",
-    async ({ params, projectService, set ,userID}) => {
-      const project =await projectService.deleteProject(params.id, userID);
+    async ({ params, projectService, set }) => {
+      const project = await projectService.deleteProject(params.id);
       set.status = HttpStatusCode.OK;
       return success(project, "Project deleted successfully");
     },

@@ -1,4 +1,4 @@
-import { CreateSuperUserDTO, UserDTO } from "./domain/user";
+import { CreateSuperUserDTO, UserDTO, UserProfileDTO } from "./domain/user";
 import { mapResponse } from "../../core/interceptor/response";
 import { t } from "elysia";
 
@@ -26,6 +26,6 @@ export const userDocs = {
       description: "Retrieve the profile information of the authenticated user",
       tags: ["Users "],
     },
-    response: mapResponse(UserDTO),
+    response: mapResponse(UserProfileDTO),
   },
 };

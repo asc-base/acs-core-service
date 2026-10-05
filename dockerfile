@@ -1,30 +1,46 @@
-FROM node:20-alpine AS base
+FROM oven/bun:1.3.10-alpine AS bun-base
 WORKDIR /usr/src/app
 
-ENV BUN_JSC_useJIT=0
-ENV BUN_JSC_useDFGJIT=0
-ENV BUN_JSC_useFTLJIT=0
+RUN apk add --no-cache netcat-openbsd openssl
 
-RUN apk add --no-cache curl unzip openssl bash && \
-    curl -fsSL https://github.com/oven-sh/bun/releases/download/bun-v1.3.10/bun-linux-x64-musl-baseline.zip -o bun.zip && \
-    unzip bun.zip && \
-    mv bun-linux-x64-musl-baseline/bun /usr/local/bin/bun && \
-    ln -s /usr/local/bin/bun /usr/local/bin/bunx && \
-    rm -rf bun.zip bun-linux-x64-musl-baseline
-
-# --- Stage 1: Install Dependencies & Generate Prisma ---
-FROM base AS install
+FROM bun-base AS bun-install
 COPY package.json bun.lock ./
 COPY prisma ./prisma/
-RUN bun install
-RUN node node_modules/.bin/prisma generate
+RUN bun install --frozen-lockfile
+RUN bunx prisma generate
 
-# --- Stage 2: Final Production Image ---
-FROM base AS release
+FROM bun-base AS local
+ENV NODE_ENV=development
 COPY . .
-COPY --from=install /usr/src/app/node_modules ./node_modules
-COPY --from=install /usr/src/app/src/generated ./src/generated
+COPY --from=bun-install /usr/src/app/node_modules ./node_modules
+COPY --from=bun-install /usr/src/app/src/generated ./src/generated
 RUN sed -i 's/\r$//' ./entrypoint/setup.sh \
     && chmod +x ./entrypoint/setup.sh
-ENTRYPOINT [ "./entrypoint/setup.sh" ]
-CMD ["bun", "--jit=false", "run", "src/index.ts"]
+ENTRYPOINT [ "sh", "./entrypoint/setup.sh" ]
+CMD [ "bun", "--watch", "src/index.ts" ]
+
+FROM local AS development
+
+FROM node:24-alpine AS node-base
+WORKDIR /usr/src/app
+
+RUN apk add --no-cache netcat-openbsd openssl
+
+FROM node-base AS node-install
+COPY package.json package-lock.json ./
+COPY prisma ./prisma/
+RUN npm ci
+RUN npx prisma generate
+
+FROM node-base AS staging
+ENV NODE_ENV=staging
+COPY . .
+COPY --from=node-install /usr/src/app/node_modules ./node_modules
+COPY --from=node-install /usr/src/app/src/generated ./src/generated
+RUN sed -i 's/\r$//' ./entrypoint/setup.sh \
+    && chmod +x ./entrypoint/setup.sh
+ENTRYPOINT [ "sh", "./entrypoint/setup.sh" ]
+CMD [ "npm", "run", "start" ]
+
+FROM staging AS production
+ENV NODE_ENV=production

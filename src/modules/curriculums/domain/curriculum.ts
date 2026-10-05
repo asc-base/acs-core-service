@@ -1,5 +1,17 @@
 import { t, Static } from "elysia";
 import { BaseModelSchema, CommonQueryParams } from "../../../core/models";
+import type { StoredImageMedia } from "../../users/domain/image-media";
+import { ImageMediaSchema } from "../../users/domain/image-media";
+
+const FocalPointInputFields = {
+  thumbnailFocalPointX: t.Optional(t.Numeric()),
+  thumbnailFocalPointY: t.Optional(t.Numeric()),
+};
+
+const FocalPointResponseFields = {
+  thumbnailFocalPointX: t.Optional(t.Nullable(t.Number())),
+  thumbnailFocalPointY: t.Optional(t.Nullable(t.Number())),
+};
 
 export const CommonCurriculumField = {
   title: t.String(),
@@ -12,7 +24,10 @@ export const CurriculumSchema = t.Intersect([
   t.Object({
     id: t.Number(),
     thumbnailURL: t.String(),
+    thumbnailContentType: t.Optional(t.Nullable(t.String())),
+    imageMedia: t.Optional(t.Nullable(ImageMediaSchema)),
     ...CommonCurriculumField,
+    ...FocalPointResponseFields,
   }),
   BaseModelSchema,
 ]);
@@ -20,12 +35,15 @@ export const CurriculumSchema = t.Intersect([
 export const CreateCurriculumDTO = t.Object({
   thumbnailFile: t.File(),
   ...CommonCurriculumField,
+  ...FocalPointInputFields,
 });
 
 export const CurriculumDTO = t.Object({
   id: t.Number(),
   thumbnailURL: t.String(),
+  thumbnailContentType: t.Optional(t.Nullable(t.String())),
   ...CommonCurriculumField,
+  ...FocalPointResponseFields,
 });
 
 export const CurriculumQueryParams = t.Object({
@@ -41,6 +59,7 @@ export const UpdateCurriculumDTO = t.Partial(
   t.Object({
     thumbnailFile: t.File(),
     ...CommonCurriculumField,
+    ...FocalPointInputFields,
   })
 );
 
@@ -50,8 +69,7 @@ export const CurriculumCreatePayloadSchema = t.Object({
   documentURL: t.String(),
   description: t.String(),
   thumbnailURL: t.String(),
-  createdBy: t.Number(),
-  updatedBy: t.Number()
+  ...FocalPointInputFields,
 });
 
 export const CurriculumUpdatePayloadSchema = t.Partial(
@@ -61,12 +79,12 @@ export const CurriculumUpdatePayloadSchema = t.Partial(
     documentURL: t.String(),
     description: t.String(),
     thumbnailURL: t.String(),
-    updatedBy: t.Number()
+    ...FocalPointInputFields,
   })
 );
 
-export type CurriculumCreatePayload = Static<typeof CurriculumCreatePayloadSchema>;
-export type CurriculumUpdatePayload = Static<typeof CurriculumUpdatePayloadSchema>;
+export type CurriculumCreatePayload = Static<typeof CurriculumCreatePayloadSchema> & { thumbnailMedia?: StoredImageMedia };
+export type CurriculumUpdatePayload = Static<typeof CurriculumUpdatePayloadSchema> & { thumbnailMedia?: StoredImageMedia };
 export type Curriculum = Static<typeof CurriculumSchema>;
 export type CreateCurriculumDTO = Static<typeof CreateCurriculumDTO>;
 export type CurriculumDTO = Static<typeof CurriculumDTO>;

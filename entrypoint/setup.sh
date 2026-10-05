@@ -4,6 +4,15 @@ set -e
 : "${DB_WAIT_TIMEOUT:=60}"
 : "${SKIP_MIGRATE:=false}"
 : "${RUN_SEED:=false}"
+
+run_prisma() {
+  if command -v bun >/dev/null 2>&1; then
+    bunx --no-install prisma "$@"
+  else
+    npx --no-install prisma "$@"
+  fi
+}
+
 # === Wait for DB (optional) ===
 if [ -n "$DATABASE_HOST" ] && [ -n "$DATABASE_PORT" ]; then
   echo "Waiting for DB at $DATABASE_HOST:$DATABASE_PORT (timeout ${DB_WAIT_TIMEOUT}s)..."
@@ -22,13 +31,13 @@ fi
 # === Prisma migrate deploy (prod) ===
 if [ "$SKIP_MIGRATE" != "true" ]; then
   echo "Running Prisma migrations..."
-  npx prisma migrate deploy
+  run_prisma migrate deploy
 else
   echo "Skipping Prisma migrate deploy (SKIP_MIGRATE=true)"
 fi
 # === (Optional) seed ===
 if [ "$RUN_SEED" = "true" ]; then
   echo "Seeding database..."
-  npx prisma db seed
+  run_prisma db seed
 fi
 exec "$@"

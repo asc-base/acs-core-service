@@ -1,6 +1,7 @@
 import { t, Static } from "elysia";
 import { BaseModelSchema, CommonQueryParams } from "../../../core/models";
-import { UserSchema, CommonUserFields, UserDTO } from "../../users/domain/user";
+import { UserSchema, CommonUserFields, UserDTO, FocalPointInputFields } from "../../users/domain/user";
+import { PrefixSchema } from "../../../core/models/prefix";
 
 export const CommonStudentFields = {
   studentCode: t.String(),
@@ -25,13 +26,12 @@ export const StudentSchema = t.Intersect([
 export const CreateStudentModel = t.Object({
   ...CommonStudentFields,
   classBookID: t.Number(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const CreateStudentDTO = t.Object({
   ...CommonStudentFields,
   ...CommonUserFields,
+  ...FocalPointInputFields,
   classBookID: t.Numeric(),
   imageFile: t.Optional(t.Nullable(t.File())),
   skills: t.Optional(t.Array(t.String())),
@@ -39,6 +39,7 @@ export const CreateStudentDTO = t.Object({
 
 export const StudentDTO = t.Object({
   id: t.Number(),
+  prefix: t.Optional(t.Nullable(PrefixSchema)),
   ...CommonStudentFields,
   user: UserDTO,
   classBookID: t.Nullable(t.Number()),
@@ -55,6 +56,7 @@ export const StudentUpdateDTO = t.Partial(
   t.Object({
     ...CommonStudentFields,
     ...CommonUserFields,
+    ...FocalPointInputFields,
     classBookID: t.Numeric(),
     imageFile: t.Optional(t.Nullable(t.File())),
     skills: t.Optional(t.Array(t.String())),
@@ -67,9 +69,9 @@ export const CreateStudent = t.Object({
   skills: t.Optional(t.Array(t.String())),
 });
 
-export const CreaetListStudentDTO = t.Object({
-  classBookID: t.Number(),
-  students: t.Array(CreateStudent),
+export const StudentBatchUploadDTO = t.Object({
+  file: t.File(),
+  classBookID: t.Numeric(),
 });
 
 export const StudentCreatePayloadSchema = t.Intersect([
@@ -102,6 +104,6 @@ export type CreateStudentModel = Static<typeof CreateStudentModel>;
 export type StudentQueryParams = Static<typeof StudentQueryParams>;
 export type StudentUpdateDTO = Static<typeof StudentUpdateDTO>;
 export type CreateStudent = Static<typeof CreateStudent>;
-export type CreaetListStudentDTO = Static<typeof CreaetListStudentDTO>;
+export type StudentBatchUploadDTO = Static<typeof StudentBatchUploadDTO>;
 export type StudentCreatePayload = Static<typeof StudentCreatePayloadSchema>;
 export type StudentUpdatePayload = Static<typeof StudentUpdatePayloadSchema>;

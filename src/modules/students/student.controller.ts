@@ -1,9 +1,9 @@
 import Elysia from "elysia";
 import { StudentService } from "./student.service";
 import { StudentRepository } from "../../infrastructure/student.repository";
+import { PrismaUnitOfWorkRepository } from "../../infrastructure/prisma-uow.repository";
 import { prisma } from "../../lib/db";
-import { UserRepository } from "../../infrastructure/user.repository";
-import { SupabaseService } from "../../core/utils/supabase";
+import { createProfileImageStorage } from "../../infrastructure/profile-image-storage";
 import { StudentDocs } from "./student.docs";
 import { StudentFactory } from "./student.factory";
 import { success } from "../../core/interceptor/response";
@@ -15,15 +15,15 @@ import { PERMISSION } from "../../core/permission/permission";
 
 const userFactory = new UserFactory();
 const studentRepository = new StudentRepository(prisma);
-const userRepository = new UserRepository(prisma);
 const studentFactory = new StudentFactory(userFactory);
-const supabaseService = new SupabaseService();
+const profileImageStorage = createProfileImageStorage();
+const studentUnitOfWork = new PrismaUnitOfWorkRepository(prisma);
 
 const studentService = new StudentService(
   studentRepository,
-  userRepository,
-  supabaseService,
+  profileImageStorage,
   studentFactory,
+  studentUnitOfWork,
 );
 
 export const StudentController = (app: Elysia) =>
@@ -35,8 +35,8 @@ export const StudentController = (app: Elysia) =>
           .use(roleMacro)
           .post(
             "",
-            async ({ body, studentService, set, userID }) => {
-              const student = await studentService.createStudent(body, userID);
+            async ({ body, studentService, set }) => {
+              const student = await studentService.createStudent(body);
               set.status = HttpStatusCode.CREATED;
               return success(
                 student,
@@ -51,12 +51,17 @@ export const StudentController = (app: Elysia) =>
           )
           .post(
             "/batch",
-            async ({ body, studentService }) => {
-              const students = await studentService.createStudentBatch(body);
+            async ({ body, studentService, set }) => {
+              const { file, classBookID } = body;
+              await studentService.importStudentsFromFile(
+                file,
+                classBookID,
+              );
+              set.status = HttpStatusCode.OK;
               return success(
-                students,
-                "Students created successfully",
-                HttpStatusCode.CREATED,
+                null,
+                "Students imported successfully",
+                HttpStatusCode.OK,
               );
             },
             {
@@ -79,10 +84,11 @@ export const StudentController = (app: Elysia) =>
           )
           .patch(
             "/:id",
-            async ({ studentService, params, body }) => {
+            async ({ studentService, params, body, userID, roles }) => {
               const student = await studentService.updateStudent(
                 params.id,
                 body,
+                { userID, isAdmin: roles.includes("admin") },
               );
               return success(student, "Student updated successfully");
             },

@@ -3,7 +3,7 @@ import {
   StudentDTO,
   StudentQueryParams,
   StudentUpdateDTO,
-  CreaetListStudentDTO,
+  StudentBatchUploadDTO,
 } from "./domain/student";
 import { mapResponse } from "../../core/interceptor/response";
 
@@ -97,13 +97,15 @@ export const StudentDocs = {
   },
   createStudentBatch: {
     detail: {
-      summary: "Create list of students",
-      description: "Create multiple students with the provided information",
+      summary: "Import students via CSV or Excel file",
+      description: "Upload a CSV, XLS, or XLSX file to bulk import students.",
       tags: ["Students"],
     },
-    body: CreaetListStudentDTO,
+    body: StudentBatchUploadDTO,
     response: {
-      201: mapResponse(t.Array(StudentDTO)),
+      200: mapResponse(t.Null()),
+      400: mapResponse(t.Null()),
+      409: mapResponse(t.Null()),
     },
   },
 };

@@ -4,6 +4,22 @@ import { Tag } from "../../../core/models/tag";
 import { UserSchema } from "../../users/domain/user";
 import { CourseSchema, CourseDTO as CourseDTOSchema } from "../../courses/domain/course";
 import { RoleSchema } from "../../../core/models/role";
+import { ImageMediaSchema, StoredImageMedia } from "../../users/domain/image-media";
+
+const FocalPointInputFields = {
+  thumbnailFocalPointX: t.Optional(t.Numeric()),
+  thumbnailFocalPointY: t.Optional(t.Numeric()),
+};
+const FocalPointResponseFields = {
+  thumbnailFocalPointX: t.Optional(t.Nullable(t.Number())),
+  thumbnailFocalPointY: t.Optional(t.Nullable(t.Number())),
+};
+
+const ProjectImageDTO = t.Object({
+  imageUrl: t.String(),
+  contentType: t.Nullable(t.String()),
+  sortOrder: t.Number(),
+});
 
 export const CommonProjectFields = {
   title: t.String(),
@@ -19,12 +35,27 @@ export const ProjectSchema = t.Intersect([
   t.Object({
     id: t.Number(),
     ...CommonProjectFields,
+    ...FocalPointResponseFields,
     thumbnailURL: t.String(),
+    thumbnailContentType: t.Optional(t.Nullable(t.String())),
     assetsURL: t.Optional(t.String()),
+    imageID: t.Optional(t.Nullable(t.Number())),
+    imageMedia: t.Optional(t.Nullable(ImageMediaSchema)),
+    images: t.Optional(t.Array(t.Object({
+      sortOrder: t.Number(),
+      image: ImageMediaSchema,
+    }))),
     techStacks: t.String(),
-    projectTags: t.Optional(t.Array(Tag)),
-    projectMembers: t.Optional(t.Array(UserSchema)),
-    projectCourses: t.Optional(t.Array(CourseSchema)),
+    projectTags: t.Optional(t.Array(t.Object({
+      tag: Tag,
+    }))),
+    projectMembers: t.Optional(t.Array(t.Object({
+      user: UserSchema,
+      role: RoleSchema,
+    }))),
+    projectCourses: t.Optional(t.Array(t.Object({
+      course: CourseSchema,
+    }))),
   }),
   BaseModelSchema,
 ]);
@@ -37,6 +68,7 @@ const ProjectMemberFields = {
 export const CreateProjectDTO = t.Object({
   thumbnailFile: t.File(),
   ...CommonProjectFields,
+  ...FocalPointInputFields,
   tagsID: t.Array(t.Number()),
   members: t.Array(t.Object(ProjectMemberFields)),
   coursesID: t.Array(t.Number()),
@@ -48,8 +80,11 @@ export const ProjectDTO = t.Intersect([
   t.Object({
     id: t.Number(),
     thumbnailURL: t.String(),
+    thumbnailContentType: t.Optional(t.Nullable(t.String())),
     ...CommonProjectFields,
+    ...FocalPointResponseFields,
     assetsURL: t.Array(t.String()),
+    images: t.Optional(t.Array(ProjectImageDTO)),
     techStacks: t.Array(t.String()),
     tag: t.Array(Tag),
 
@@ -82,6 +117,7 @@ export const UpdateProjectDTO = t.Object({
       t.Optional(value),
     ])
   ),
+  ...FocalPointInputFields,
   newtagsID: t.Optional(t.Array(t.Number())),
   deletedtagsID: t.Optional(t.Array(t.Number())),
   newMembers: t.Optional(t.Array(t.Object(ProjectMemberFields))),
@@ -102,9 +138,8 @@ export const ProjectCreatePayloadSchema = t.Object({ //มาดูอีกท�
   youtubeURL: t.String(),
   thumbnailURL: t.String(),
   assetsURL: t.String(),
+  ...FocalPointInputFields,
   techStacks: t.String(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const ProjectUpdatePayloadSchema = t.Partial(
@@ -118,8 +153,8 @@ export const ProjectUpdatePayloadSchema = t.Partial(
     youtubeURL: t.String(),
     thumbnailURL: t.String(),
     assetsURL: t.String(),
+    ...FocalPointInputFields,
     techStacks: t.String(),
-    updatedBy: t.Number(),
     updatedAt: t.Date(),
   })
 );
@@ -127,23 +162,17 @@ export const ProjectUpdatePayloadSchema = t.Partial(
 export const ProjectTagPayloadSchema = t.Object({
   projectID: t.Number(),
   tagID: t.Number(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const ProjectMemberPayloadSchema = t.Object({
   projectID: t.Number(),
   userID: t.Number(),
   roleID: t.Number(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const ProjectCoursePayloadSchema = t.Object({
   projectID: t.Number(),
   courseID: t.Number(),
-  createdBy: t.Number(),
-  updatedBy: t.Number(),
 });
 
 export const ProjectIdParam = t.Object({
@@ -156,8 +185,14 @@ export type UpdateProjectDTO = Static<typeof UpdateProjectDTO>;
 export type ProjectDTO = Static<typeof ProjectDTO>;
 export type ProjectQueryParams = Static<typeof ProjectQueryParams>;
 
-export type ProjectCreatePayload = Static<typeof ProjectCreatePayloadSchema>;
-export type ProjectUpdatePayload = Static<typeof ProjectUpdatePayloadSchema>;
+export type ProjectCreatePayload = Static<typeof ProjectCreatePayloadSchema> & {
+  thumbnailMedia?: StoredImageMedia;
+  galleryMedia?: Array<StoredImageMedia & { sortOrder: number }>;
+};
+export type ProjectUpdatePayload = Static<typeof ProjectUpdatePayloadSchema> & {
+  thumbnailMedia?: StoredImageMedia;
+  galleryMedia?: Array<StoredImageMedia & { sortOrder: number }>;
+};
 export type ProjectTagPayload = Static<typeof ProjectTagPayloadSchema>;
 export type ProjectMemberPayload = Static<typeof ProjectMemberPayloadSchema>;
 export type ProjectCoursePayload = Static<typeof ProjectCoursePayloadSchema>;

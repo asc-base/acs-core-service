@@ -7,19 +7,20 @@ export interface IProfessorFactory {
 }
 
 export class ProfessorFactory implements IProfessorFactory {
-  constructor(private readonly userFactory: IUserFactory) {}
+  constructor(private readonly userFactory: IUserFactory) { }
   mapProfessorToDTO(professor: Professor): ProfessorDTO {
     return {
       id: professor.id,
       profRoom: professor.profRoom,
+      prefix: professor.user.prefix,
       user: this.userFactory.mapUserToDTO(professor.user),
       phone: professor.phone,
-      academicPosition: professor.academicPosition,
+      research_profile: professor.researchProfile ?? null,
       expertFields: professor.expertFields
-        ? professor.expertFields?.split(",").map((field) => field.trim())
+        ? professor.expertFields?.split("/").map((field) => field.trim()).filter((field) => field.length > 0)
         : [],
       educations: professor.educations
-        ? professor.educations?.split("/").map((edu) => edu.trim())
+        ? professor.educations?.split("/").map((edu) => edu.trim()).filter((edu) => edu.length > 0)
         : [],
     };
   }

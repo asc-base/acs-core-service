@@ -11,7 +11,10 @@ export class CurriculumFactory implements ICurriculumFactory {
       title: curriculum.title,
       year: curriculum.year,
       description: curriculum.description,
-      thumbnailURL: curriculum.thumbnailURL,
+      thumbnailURL: curriculum.imageMedia?.imageUrl ?? curriculum.thumbnailURL,
+      thumbnailContentType: curriculum.imageMedia?.contentType ?? null,
+      thumbnailFocalPointX: curriculum.thumbnailFocalPointX,
+      thumbnailFocalPointY: curriculum.thumbnailFocalPointY,
       documentURL: curriculum.documentURL,
     };
   }

@@ -1,46 +1,69 @@
-import Elysia from "elysia";
+import Elysia, { type HTTPHeaders } from "elysia";
 import { AuthService } from "./auth.service";
-import { AuthRepository } from "../../infrastructure/auth.repository";
-import { AuthFactory } from "./auth.factory";
-import { UserRepository } from "../../infrastructure/user.repository";
-import { prisma } from "../../lib/db";
 import { authDocs } from "./auth.docs";
 import { HttpStatusCode } from "../../core/types/http";
 import { success } from "../../core/interceptor/response";
-import { UserFactory } from "../users/user.factory";
-import { jwtPlugin } from "../../core/plugins/jwt";
-import { config } from "../../core/config/config";
+import { auth } from "../../lib/auth";
+import { passwordResetRedirectURL } from "../../lib/password-reset";
+import { BetterAuthPasswordResetProvider } from "./password-reset.provider";
+import { UserRepository } from "../../infrastructure/user.repository";
+import { prisma } from "../../lib/db";
 
-const authRepository = new AuthRepository(prisma);
-const userRepository = new UserRepository(prisma);
-const authFactory = new AuthFactory();
-const userFactory = new UserFactory();
+const forwardSetCookies = (
+  set: { headers: HTTPHeaders },
+  headers?: Headers,
+) => {
+  if (!headers) {
+    return;
+  }
+
+  const getSetCookie = (headers as Headers & { getSetCookie?: () => string[] })
+    .getSetCookie;
+  const cookies = getSetCookie?.call(headers) ?? [];
+  const fallbackCookie = headers.get("set-cookie");
+  const responseHeaders = set.headers as HTTPHeaders & {
+    "set-cookie"?: string | string[];
+  };
+
+  if (cookies.length > 0) {
+    responseHeaders["set-cookie"] = cookies;
+  } else if (fallbackCookie) {
+    responseHeaders["set-cookie"] = fallbackCookie;
+  }
+};
 
 export const authService = new AuthService(
-  userRepository,
-  authRepository,
-  authFactory,
-  userFactory,
+  new BetterAuthPasswordResetProvider(),
+  passwordResetRedirectURL,
+  new UserRepository(prisma),
 );
 export const AuthController = (app: Elysia) =>
   app.group("/auth", (app) =>
     app
-      .use(jwtPlugin)
       .decorate("authService", authService)
       .post(
         "/login",
-        async ({ body, set, jwt, cookie: { accessToken } }) => {
-          const user = await authService.authenticate(body);
+        async ({ body, set, request }) => {
+          const result = await auth.api.signInEmail({
+            body,
+            headers: request.headers,
+            returnHeaders: true,
+            returnStatus: true,
+          });
+          const response = result.response;
+          const token =
+            response && typeof response === "object" && "token" in response
+              ? response.token
+              : null;
 
-          const token = await jwt.sign({ id: user.userID, roles: user.roles });
+          if (!token) {
+            throw new Error("Failed to create Better Auth session");
+          }
+
+          forwardSetCookies(set, result.headers);
 
           set.status = HttpStatusCode.OK;
-
-          accessToken.set({
-            value: token,
-            httpOnly: true,
-            secure: config.ENVIRONMENT === "production",
-          });
+          set.headers["content-type"] = "application/json";
           return success(
             { accessToken: token, refreshToken: token },
             "Authenticated successfully",
@@ -51,56 +74,35 @@ export const AuthController = (app: Elysia) =>
       )
       .post(
         "/logout",
-        async ({ cookie: { accessToken }, set }) => {
-          accessToken.remove();
+        async ({ request, set }) => {
+          const result = await auth.api.signOut({
+            headers: request.headers,
+            returnHeaders: true,
+            returnStatus: true,
+          });
+          forwardSetCookies(set, result.headers);
           set.status = HttpStatusCode.OK;
-          return success(
-            null,
-            "Logged out successfully",
-            HttpStatusCode.OK,
-          );
+          return success(null, "Logged out successfully", HttpStatusCode.OK);
         },
         authDocs.logout,
       )
       .post(
         "/credentials",
-        async ({ body, set }) => {
-          const credentials = await authService.createCredentials(body);
-          set.status = HttpStatusCode.CREATED;
+        async ({ body, request, set }) => {
+          await authService.createCredentials(body, request.headers);
+          set.status = HttpStatusCode.OK;
           return success(
-            credentials,
-            "Created credentials successfully",
-            HttpStatusCode.CREATED,
+            null,
+            "If this email exists, password reset instructions will be sent",
+            HttpStatusCode.OK,
           );
         },
         authDocs.createCredentials,
       )
-      .get(
-        "/credentials/:referenceCode",
-        async ({ params, set }) => {
-          const credentials = await authService.getCredentialsByReferenceCode(
-            params.referenceCode,
-          );
-          if (!credentials) {
-            return success(null);
-          }
-
-          set.status = HttpStatusCode.OK;
-          return success(
-            credentials,
-            "Fetched credentials successfully",
-            HttpStatusCode.OK,
-          );
-        },
-        authDocs.getCredentialsByReferenceCode,
-      )
       .post(
-        "/reset-password/:referenceCode",
-        async ({ params, body, set }) => {
-          await authService.resetPassword(
-            params.referenceCode,
-            body.newPassword,
-          );
+        "/reset-password/:token",
+        async ({ params, body, request, set }) => {
+          await authService.resetPassword(params.token, body, request.headers);
           set.status = HttpStatusCode.OK;
           return success(
             null,

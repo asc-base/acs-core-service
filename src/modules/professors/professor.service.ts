@@ -1,4 +1,3 @@
-import { SupabaseService } from "../../core/utils/supabase";
 import { IUserRepository } from "../users/domain/user.repository";
 import {
   CreateProfessorDTO,
@@ -13,13 +12,41 @@ import { UpdateUserModel } from "../users/domain/user";
 import { IProfessorRepository } from "./domain/professor.repository";
 import { IProfessorFactory } from "./profressor.factory";
 import { CreateUserModel } from "../users/domain/user";
-import { Prisma } from "../../generated/prisma/client";
 import { AppError } from "../../core/error/app-error";
 import { ErrorCode } from "../../core/types/errors";
-import { HttpStatusCode } from "../../core/types/http";
 import { PageableType } from "../../core/models";
+import { IUnitOfWork } from "../../core/uow/uow.interface";
+import { ProfileImageStorage, StoredImage } from "../../infrastructure/profile-image-storage";
+import { validateProfileImage } from "../users/profile-image-validation";
+
+export function normalizeResearchProfileURL(value: string | null | undefined) {
+  if (value == null) return value;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  try {
+    const url = new URL(normalized);
+    if (
+      /^https?:\/\//i.test(normalized) &&
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      url.hostname
+    ) {
+      return normalized;
+    }
+  } catch {
+    // Fall through to the validation error below.
+  }
+
+  throw new AppError(
+    ErrorCode.VALIDATION_ERROR,
+    "Research profile must be a full HTTP or HTTPS URL",
+    400,
+  );
+}
+
 interface IProfessorService {
-  createProfessor(data: CreateProfessorDTO): Promise<ProfessorDTO>;
+  createProfessor(
+    data: CreateProfessorDTO,
+  ): Promise<ProfessorDTO>;
   getProfessors(
     query: ProfessorQueryParams,
   ): Promise<PageableType<typeof ProfessorDTO>>;
@@ -35,10 +62,13 @@ export class ProfessorService implements IProfessorService {
     private readonly professorRepository: IProfessorRepository,
     private readonly userRepository: IUserRepository,
     private readonly professorFactory: IProfessorFactory,
-    private readonly storage: SupabaseService,
-  ) {}
+    private readonly storage: ProfileImageStorage,
+    private readonly unitOfWork: IUnitOfWork,
+  ) { }
 
-  async createProfessor(data: CreateProfessorDTO): Promise<ProfessorDTO> {
+  async createProfessor(
+    data: CreateProfessorDTO,
+  ): Promise<ProfessorDTO> {
     const {
       imageFile,
       firstNameTh,
@@ -46,81 +76,114 @@ export class ProfessorService implements IProfessorService {
       lastNameTh,
       lastNameEn,
       email,
+      imageFocalPointX,
+      imageFocalPointY,
+      prefixID,
+      research_profile,
       ...rawProfessorData
     } = data;
-    let pathImage: string | null = null;
-    let expertFieldsString: string | null = "";
-    let educationsString: string | null = "";
+    const researchProfile = normalizeResearchProfileURL(research_profile);
+    let storedImage: StoredImage | null = null;
     try {
-      if (imageFile) {
-        pathImage = await this.storage.uploadFile(imageFile, "professors");
-      }
-
-      const userData: CreateUserModel = {
-        firstNameTh,
-        lastNameTh,
-        firstNameEn,
-        lastNameEn,
-        email,
-        imageUrl: pathImage,
-        createdBy: 0,
-        updatedBy: 0,
-      };
-
-      const user = await this.userRepository.createUser(userData);
-
-      if (!user) {
+      const existingUser = await this.userRepository.getUserByEmail(email);
+      const existingProfessor = existingUser
+        ? await this.professorRepository.getProfessorByUserId(existingUser.id)
+        : null;
+      if (existingProfessor?.deletedAt === null) {
         throw new AppError(
-          ErrorCode.DATABASE_ERROR,
-          "Failed to create user for professor",
-          500,
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "Professor with this email already exists",
+          400,
         );
       }
 
-      const role = await this.userRepository.assignUserRole({
-        userID: user.id,
-        roleID: 3,
-        createdBy: 0,
-        updatedBy: 0,
+      const contentType = imageFile
+        ? await validateProfileImage(imageFile)
+        : null;
+      if (imageFile && contentType) {
+        storedImage = await this.storage.upload(imageFile, contentType);
+      }
+
+      const professor = await this.unitOfWork.runInTransaction(async (tx) => {
+        const image = storedImage
+          ? await tx.imageMedia.create({
+              ...storedImage,
+              fileName: imageFile!.name,
+              contentType: contentType!,
+              fileSize: imageFile!.size,
+            })
+          : null;
+        const userData: UpdateUserModel = {
+          firstNameTh,
+          prefixID,
+          lastNameTh,
+          firstNameEn,
+          lastNameEn,
+          ...(image && {
+            imageID: image.id,
+            imageUrl: storedImage!.imageUrl,
+            imageFocalPointX: imageFocalPointX ?? null,
+            imageFocalPointY: imageFocalPointY ?? null,
+          }),
+          ...(!image && { imageFocalPointX, imageFocalPointY }),
+        };
+
+        let user;
+        if (existingUser) {
+          user = await tx.user.updateUser(existingUser.id, userData);
+        } else {
+          const createUserData: CreateUserModel = {
+            firstNameTh,
+            lastNameTh,
+            firstNameEn,
+            lastNameEn,
+            prefixID,
+            email,
+            imageID: image?.id ?? null,
+            imageUrl: storedImage?.imageUrl ?? null,
+            imageFocalPointX: image ? imageFocalPointX ?? null : imageFocalPointX,
+            imageFocalPointY: image ? imageFocalPointY ?? null : imageFocalPointY,
+          };
+          user = await tx.user.createUser(createUserData);
+          await tx.user.assignUserRole({ userID: user.id, roleID: 3 });
+        }
+
+        let professor: Professor;
+        if (existingProfessor) {
+          professor = await tx.professor.updateProfessor(existingProfessor.id, {
+            ...rawProfessorData,
+            researchProfile,
+            deletedAt: null,
+          });
+        } else {
+          const professorData: ProfessorCreatePayload = {
+            ...rawProfessorData,
+            researchProfile: researchProfile ?? null,
+            userID: user.id,
+          };
+          professor = await tx.professor.createProfessor(professorData);
+          if (
+            existingUser &&
+            !existingUser.userRoles?.some((role) => role.roleID === 3)
+          ) {
+            await tx.user.assignUserRole({ userID: user.id, roleID: 3 });
+          }
+        }
+        professor.user = user;
+        return this.professorFactory.mapProfessorToDTO(professor);
       });
-
-      if (!role) {
-        throw new AppError(
-          ErrorCode.DATABASE_ERROR,
-          "Failed to assign role to student user",
-        );
-      }
-
-      if (rawProfessorData.expertFields) {
-        expertFieldsString = rawProfessorData.expertFields
-          ?.split("/")
-          .map((field) => field.trim())
-          .join(",");
-      }
-
-      if (rawProfessorData.educations) {
-        educationsString = rawProfessorData.educations
-          ?.split("/")
-          .map((edu) => edu.trim())
-          .join("/");
-      }
-
-      const professorData: ProfessorCreatePayload = {
-        ...rawProfessorData,
-        expertFields: expertFieldsString,
-        academicPositionID: rawProfessorData.academicPositionID,
-        educations: educationsString,
-        userID: user.id,
-        createdBy: 0,
-        updatedBy: 0,
-      };
-
-      const professor =
-        await this.professorRepository.createProfessor(professorData);
-
-      return this.professorFactory.mapProfessorToDTO(professor);
+      return professor;
     } catch (error) {
-      console.log(error);
+      if (storedImage) {
+        await this.storage
+          .delete(storedImage.bucket, storedImage.fileKey)
+          .catch((cleanupError) => {
+            console.error("Failed to clean up profile image", {
+              ...storedImage,
+              error: cleanupError,
+            });
+          });
+      }
       throw error;
     }
   }
@@ -167,63 +230,68 @@ export class ProfessorService implements IProfessorService {
       profRoom,
       educations,
       expertFields,
-      academicPositionID,
+      research_profile,
       ...UserData
     } = data;
-    let pathImage: string | undefined = undefined;
-    let professor: Professor | null;
+    const existing = await this.professorRepository.getProfessorById(professorID);
+    if (!existing) return null;
+
+    let storedImage: StoredImage | null = null;
+    let imageContentType: string | null = null;
     try {
       if (imageFile) {
-        pathImage = await this.storage.uploadFile(imageFile, "professors");
+        imageContentType = await validateProfileImage(imageFile);
+        storedImage = await this.storage.upload(imageFile, imageContentType);
       }
 
       const updatedProfessor: ProfessorUpdatePayload = {
         phone,
         profRoom,
-        academicPositionID,
         educations,
         expertFields,
-        updatedBy: 0,
+        ...(research_profile !== undefined && {
+          researchProfile: normalizeResearchProfileURL(research_profile),
+        }),
       };
 
-      professor = await this.professorRepository.updateProfessor(
-        professorID,
-        updatedProfessor,
-      );
-
-      if (!professor) {
-        return null;
-      }
-
-      const updatedUserData: UpdateUserModel = {
-        ...UserData,
-        ...(pathImage && { imageUrl: pathImage }),
-        updatedBy: 0,
-      };
-
-      const user = await this.userRepository.updateUser(
-        professor.userID,
-        updatedUserData,
-      );
-
-      if (!user) {
-        throw new AppError(
-          ErrorCode.DATABASE_ERROR,
-          "Failed to update user for professor",
-          500,
+      const professor = await this.unitOfWork.runInTransaction(async (tx) => {
+        const image = storedImage
+          ? await tx.imageMedia.create({
+              ...storedImage,
+              fileName: imageFile!.name,
+              contentType: imageContentType!,
+              fileSize: imageFile!.size,
+            })
+          : null;
+        const user = await tx.user.updateUser(existing.userID, {
+          ...UserData,
+          ...(image && {
+            imageID: image.id,
+            imageUrl: storedImage!.imageUrl,
+            imageFocalPointX: UserData.imageFocalPointX ?? null,
+            imageFocalPointY: UserData.imageFocalPointY ?? null,
+          }),
+        });
+        const updated = await tx.professor.updateProfessor(
+          professorID,
+          updatedProfessor,
         );
-      }
-
-      professor.user = user;
-
-      return this.professorFactory.mapProfessorToDTO(professor);
+        updated.user = user;
+        return this.professorFactory.mapProfessorToDTO(updated);
+      });
+      return professor;
     } catch (error) {
-      console.log(error);
-      throw new AppError(
-        ErrorCode.DATABASE_ERROR,
-        "Failed to update professor",
-        HttpStatusCode.INTERNAL_SERVER_ERROR,
-      );
+      if (storedImage) {
+        await this.storage
+          .delete(storedImage.bucket, storedImage.fileKey)
+          .catch((cleanupError) => {
+            console.error("Failed to clean up profile image", {
+              ...storedImage,
+              error: cleanupError,
+            });
+          });
+      }
+      throw error;
     }
   }
 

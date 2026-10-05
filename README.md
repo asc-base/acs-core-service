@@ -1,15 +1,22 @@
-# Elysia with Bun runtime
+# Elysia with Node.js runtime
 
 ## Getting Started
-To get started with this template, simply paste this command into your terminal:
+Install dependencies:
 ```bash
-bun create elysia ./elysia-example
+npm ci
 ```
 
 ## Development
 To start the development server run:
 ```bash
-bun run dev
+npm run dev
 ```
 
-Open http://localhost:3000/ with your browser to see the result.
+The health endpoint is available at http://localhost:8000/api/v1/health by default.
+
+Docker Compose uses the Bun-based `local` target. Build the Bun-based development-server image, or Node.js images for staging and production, explicitly:
+```bash
+docker build --target development -f dockerfile -t acs-core-service:development .
+docker build --target staging -f dockerfile -t acs-core-service:staging .
+docker build --target production -f dockerfile -t acs-core-service:production .
+```

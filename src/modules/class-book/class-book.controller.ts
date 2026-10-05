@@ -3,7 +3,7 @@ import { prisma } from "../../lib/db";
 import { ClassBookRepository } from "../../infrastructure/class-book.repository";
 import { ClassBookService } from "./class-book.service";
 import { ClassBookFactory } from "./class-book.factory";
-import { SupabaseService } from "../../core/utils/supabase";
+import { createCentralImageStorage } from "../../infrastructure/profile-image-storage";
 import { success } from "../../core/interceptor/response";
 import { HttpStatusCode } from "../../core/types/http";
 import { ClassBookDocs } from "./class-book.docs";
@@ -13,13 +13,13 @@ import { roleMacro } from "../../middleware/checkRole";
 import { PERMISSION } from "../../core/permission/permission";
 
 const curriculumFactory = new CurriculumFactory();
-const supabaseService = new SupabaseService();
+const imageStorage = createCentralImageStorage();
 const classBookRepository = new ClassBookRepository(prisma);
 const classBookFactory = new ClassBookFactory(curriculumFactory);
 const classBookService = new ClassBookService(
   classBookRepository,
   classBookFactory,
-  supabaseService,
+  imageStorage,
 );
 
 
@@ -33,8 +33,8 @@ export const ClassBookController = (app: Elysia) =>
           .use(roleMacro)
           .post(
             "",
-            async ({ classBookService, body, set, userID }) => {
-              const classBook = await classBookService.createClassBook(body, userID);
+            async ({ classBookService, body, set }) => {
+              const classBook = await classBookService.createClassBook(body);
               set.status = HttpStatusCode.CREATED;
               return success(
                 classBook,
@@ -49,11 +49,10 @@ export const ClassBookController = (app: Elysia) =>
           )
           .patch(
             "/:id",
-            async ({ classBookService, params, body, userID }) => {
+            async ({ classBookService, params, body }) => {
               const classBook = await classBookService.updateClassBook(
                 Number(params.id),
                 body,
-                userID,
               );
               return success(
                 classBook,

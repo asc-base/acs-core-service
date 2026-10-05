@@ -1,6 +1,11 @@
 import { mapResponse } from "../../core/interceptor/response";
 import { Pageable } from "../../core/models";
-import { CourseDTO, CourseQueryParams, CreateCourseDTO, UpdateCourseDTO } from "./domain/course";
+import {
+  CourseDTO,
+  CourseQueryParams,
+  CreateCourseDTO,
+  UpdateCourseDTO,
+} from "./domain/course";
 import { t } from "elysia";
 
 export const CourseDocs = {
@@ -34,7 +39,7 @@ export const CourseDocs = {
       tags: ["Courses"],
     },
     params: t.Object({
-        id: t.Number(),
+      id: t.Number(),
     }),
     response: {
       200: mapResponse(CourseDTO),
@@ -49,34 +54,51 @@ export const CourseDocs = {
       tags: ["Courses"],
     },
     transform({ body }: { body: UpdateCourseDTO }) {
-          Object.keys(body).forEach((key) => {
-            const k = key as keyof UpdateCourseDTO;
-            if (body[k] === "") {
-              body[k] = undefined;
-            }
-          });
-        },
-        params: t.Object({
-          id: t.Numeric(),
-        }),
-        body: UpdateCourseDTO,
-        response: {
-          200: mapResponse(CourseDTO),
-          404: mapResponse(t.Null()),
-        },
+      Object.keys(body).forEach((key) => {
+        const k = key as keyof UpdateCourseDTO;
+        if (body[k] === "") {
+          body[k] = undefined;
+        }
+      });
+    },
+    params: t.Object({
+      id: t.Numeric(),
+    }),
+    body: UpdateCourseDTO,
+    response: {
+      200: mapResponse(CourseDTO),
+      404: mapResponse(t.Null()),
+    },
   },
-  DeleteCourse:{
-     detail: {
+  DeleteCourse: {
+    detail: {
       summary: "Delete course",
       description: "Delete a course by ID",
       tags: ["Courses"],
     },
     params: t.Object({
-        id: t.Number(),
+      id: t.Number(),
     }),
     response: {
       200: mapResponse(CourseDTO),
       404: mapResponse(t.Null()),
+    },
+  },
+  batchCreateCourses: {
+    detail: {
+      summary: "Import courses via CSV or Excel file",
+      description: "Upload a CSV, XLS, or XLSX file to bulk import courses.",
+      tags: ["Courses"],
+    },
+    body: t.Object({
+      file: t.File({
+        description: "CSV, XLS, or XLSX file containing course data",
+      }),
+    }),
+    response: {
+      200: mapResponse(t.Null()),
+      400: mapResponse(t.Null()),
+      409: mapResponse(t.Null()),
     },
   },
 };

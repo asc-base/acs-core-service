@@ -11,6 +11,7 @@ export class StudentFactory implements IStudentFactory {
   MapStudentToDTO(student: Student): StudentDTO {
     return {
       id: student.id,
+      prefix: student.user.prefix,
       studentCode: student.studentCode,
       linkedin: student.linkedin,
       github: student.github,
@@ -18,7 +19,10 @@ export class StudentFactory implements IStudentFactory {
       instagram: student.instagram,
       classBookID: student.classBookID,
       skills: student.skills
-        ? student.skills.split(",").map((skill) => skill.trim()).filter((s) => s !== "")
+        ? student.skills
+            .split(",")
+            .map((skill) => skill.trim())
+            .filter((s) => s !== "")
         : [],
       user: this.userFactory.mapUserToDTO(student.user),
     };

@@ -51,9 +51,25 @@ export const CourseController = (app: Elysia) =>
           .use(authMiddleware)
           .use(roleMacro)
           .post(
+            "/batch",
+            async ({ courseService, body, set }) => {
+              await courseService.importCoursesFromFile(body.file as File);
+              set.status = HttpStatusCode.OK;
+              return success(
+                null,
+                "Courses imported successfully",
+                HttpStatusCode.OK,
+              );
+            },
+            {
+              ...CourseDocs.batchCreateCourses,
+              checkRole: PERMISSION.ADMINPERSMISSION,
+            },
+          )
+          .post(
             "",
-            async ({ courseService, body, set, userID }) => {
-              const course = await courseService.createCourse(body, userID);
+            async ({ courseService, body, set }) => {
+              const course = await courseService.createCourse(body);
               set.status = HttpStatusCode.CREATED;
               return success(
                 course,
@@ -65,55 +81,52 @@ export const CourseController = (app: Elysia) =>
           )
           .patch(
             "/:id",
-            async ({ courseService, params, body, set, userID }) => {
+            async ({ courseService, params, body, set }) => {
               const course = await courseService.updateCourse(
                 Number(params.id),
                 body,
-                userID,
               );
               if (!course) {
                 set.status = HttpStatusCode.NOT_FOUND;
                 return success(
                   null,
                   "Course not found",
-                  HttpStatusCode.NOT_FOUND
+                  HttpStatusCode.NOT_FOUND,
                 );
               }
               return success(
                 course,
                 "Course update successfully",
-                HttpStatusCode.OK,);
+                HttpStatusCode.OK,
+              );
             },
             {
               ...CourseDocs.updateCourse,
               checkRole: PERMISSION.ADMINPERSMISSION,
             },
-
           )
           .delete(
             "/:id",
-            async ({ courseService, params, set, userID }) => {
-              const course = await courseService.deleteCourse(
-                Number(params.id),
-                userID,
-              );
+            async ({ courseService, params, set }) => {
+              const course = await courseService.deleteCourse(Number(params.id));
               if (!course) {
                 set.status = HttpStatusCode.NOT_FOUND;
                 return success(
                   null,
                   "Course not found",
-                  HttpStatusCode.NOT_FOUND
+                  HttpStatusCode.NOT_FOUND,
                 );
               }
               return success(
                 course,
                 "Delete course successfully",
-                HttpStatusCode.OK,);
+                HttpStatusCode.OK,
+              );
             },
             {
               ...CourseDocs.DeleteCourse,
               checkRole: PERMISSION.ADMINPERSMISSION,
-            }
-          )
-      )
+            },
+          ),
+      ),
   );

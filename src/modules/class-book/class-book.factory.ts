@@ -7,13 +7,16 @@ export interface IClassBookFactory {
 }
 
 export class ClassBookFactory implements IClassBookFactory {
-  constructor(private readonly curriculumFactory: ICurriculumFactory) {}
+  constructor(private readonly curriculumFactory: ICurriculumFactory) { }
   mapClassBookToDTO(classBook: ClassBook): ClassBookDTO {
     return {
       id: classBook.id,
       classof: classBook.classof,
       firstYearAcademic: classBook.firstYearAcademic,
-      thumbnailURL: classBook.thumbnailURL,
+      thumbnailURL: classBook.imageMedia?.imageUrl ?? classBook.thumbnailURL,
+      thumbnailContentType: classBook.imageMedia?.contentType ?? null,
+      imageFocalPointX: classBook.imageFocalPointX,
+      imageFocalPointY: classBook.imageFocalPointY,
       curriculumID: classBook.curriculumID,
       curriculum: this.curriculumFactory.mapCurriculumToDTO(
         classBook.curriculum,

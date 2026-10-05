@@ -1,0 +1,15 @@
+name: Release to Staging
+
+on:
+  push:
+    branches:
+      - "release/**"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    uses: asc-base/acs-website-infra/.github/workflows/release-rc-elysia.yml@main
+    secrets: inherit

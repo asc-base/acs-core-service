@@ -17,8 +17,14 @@ export const ProfessorDocs = {
       tags: ["Professors"],
     },
     transform({ body }: { body: ProfessorUpdateDTO }) {
-      if (body.expertFields != "" || body.expertFields != null) {
-        body.expertFields = body.expertFields?.replaceAll(",", "/");
+      if (body.expertFields != null && body.expertFields !== "") {
+        body.expertFields = body.expertFields.replaceAll(",", "/");
+      }
+      if (body.educations != null && body.educations !== "") {
+        body.educations = body.educations.replaceAll(",", "/");
+      }
+      if (body.research_profile != null) {
+        body.research_profile = body.research_profile.trim() || null;
       }
     },
     body: CreateProfessorDTO,
@@ -62,9 +68,19 @@ export const ProfessorDocs = {
       tags: ["Professors"],
     },
     transform({ body }: { body: ProfessorUpdateDTO }) {
+      if (body.expertFields != null && body.expertFields !== "") {
+        body.expertFields = body.expertFields.replaceAll(",", "/");
+      }
+      if (body.educations != null && body.educations !== "") {
+        body.educations = body.educations.replaceAll(",", "/");
+      }
+      if (body.research_profile != null) {
+        body.research_profile = body.research_profile.trim();
+      }
+
       Object.keys(body).forEach((key) => {
         const k = key as keyof ProfessorUpdateDTO;
-        if (body[k] === "") {
+        if (body[k] === "" && k !== "research_profile") {
           body[k] = undefined;
         }
       });

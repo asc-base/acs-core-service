@@ -6,7 +6,8 @@ import { prisma } from "../../lib/db";
 import { ProfessorDocs } from "./professor.docs";
 import { success } from "../../core/interceptor/response";
 import { HttpStatusCode } from "../../core/types/http";
-import { SupabaseService } from "../../core/utils/supabase";
+import { createProfileImageStorage } from "../../infrastructure/profile-image-storage";
+import { PrismaUnitOfWorkRepository } from "../../infrastructure/prisma-uow.repository";
 import { UserRepository } from "../../infrastructure/user.repository";
 import { UserFactory } from "../users/user.factory";
 import { authMiddleware } from "../../middleware/auth";
@@ -14,7 +15,8 @@ import { roleMacro } from "../../middleware/checkRole";
 import { PERMISSION } from "../../core/permission/permission";
 
 const userFactory = new UserFactory();
-const storage = new SupabaseService();
+const storage = createProfileImageStorage();
+const unitOfWork = new PrismaUnitOfWorkRepository(prisma);
 const userRepository = new UserRepository(prisma);
 const professorRepository = new ProfessorRepository(prisma);
 const professorFactory = new ProfessorFactory(userFactory);
@@ -23,6 +25,7 @@ const professorService = new ProfessorService(
   userRepository,
   professorFactory,
   storage,
+  unitOfWork,
 );
 
 export const ProfessorController = (app: Elysia) =>
@@ -84,7 +87,9 @@ export const ProfessorController = (app: Elysia) =>
           .post(
             "",
             async ({ professorService, body, set }) => {
-              const professor = await professorService.createProfessor(body);
+              const professor = await professorService.createProfessor(
+                body,
+              );
               if (!professor) {
                 set.status = HttpStatusCode.INTERNAL_SERVER_ERROR;
                 return success(

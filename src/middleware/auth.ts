@@ -1,14 +1,15 @@
 import Elysia from "elysia";
-import { jwtPlugin } from "../core/plugins/jwt";
 import { AppError } from "../core/error/app-error";
 import { ErrorCode } from "../core/types/errors";
 import { HttpStatusCode } from "../core/types/http";
+import { auth } from "../lib/auth";
+import { prisma } from "../lib/db";
 
 export const authMiddleware = (app: Elysia) =>
-  app.use(jwtPlugin).derive(async ({ jwt, cookie: { accessToken } }) => {
-    const token = accessToken;
+  app.derive(async ({ request }) => {
+    const session = await auth.api.getSession({ headers: request.headers });
 
-    if (!token) {
+    if (!session) {
       throw new AppError(
         ErrorCode.AUTHENTICATION_ERROR,
         "Unauthorized",
@@ -16,18 +17,35 @@ export const authMiddleware = (app: Elysia) =>
       );
     }
 
-    const payload = await jwt.verify(token.value as string);
-
-    if (!payload) {
+    const userID = Number(session.user.id);
+    if (!Number.isSafeInteger(userID)) {
       throw new AppError(
         ErrorCode.AUTHENTICATION_ERROR,
-        "Invalid token",
+        "Invalid session",
         HttpStatusCode.UNAUTHORIZED,
       );
     }
+
+    const userRecord = await prisma.user.findFirst({
+      where: { id: userID, deletedAt: null },
+      include: {
+        userRoles: {
+          include: { role: true },
+        },
+      },
+    });
+
+    if (!userRecord) {
+      throw new AppError(
+        ErrorCode.AUTHENTICATION_ERROR,
+        "Unauthorized",
+        HttpStatusCode.UNAUTHORIZED,
+      );
+    }
+
     const user = {
-      userID: payload.id as number,
-      roles: payload.roles,
+      userID,
+      roles: userRecord.userRoles.map((userRole) => userRole.role.name),
     };
 
     return user;

@@ -19,8 +19,7 @@ export class ProfessorRepository implements IProfessorRepository {
     const professor = await this.db.professor.create({
       data,
       include: {
-        user: true,
-        academicPosition: true,
+        user: { include: { prefix: true, imageMedia: true } },
       },
     });
     return professor as unknown as Professor;
@@ -32,7 +31,6 @@ export class ProfessorRepository implements IProfessorRepository {
       pageSize = 10,
       orderBy = "createdAt",
       sortBy = "asc",
-      academicPosition,
       search,
       searchBy,
     } = query;
@@ -59,8 +57,7 @@ export class ProfessorRepository implements IProfessorRepository {
         ...searchCondition,
       },
       include: {
-        user: true,
-        academicPosition: academicPosition,
+        user: { include: { prefix: true, imageMedia: true } },
       },
     });
     return professors as unknown as Professor[];
@@ -71,11 +68,33 @@ export class ProfessorRepository implements IProfessorRepository {
       const professor = await this.db.professor.findUnique({
         where: { id, deletedAt: null },
         include: {
-          user: true,
-          academicPosition: true,
+          user: { include: { prefix: true, imageMedia: true } },
         },
       });
       return professor as Professor | null;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2025") {
+          return null;
+        }
+      }
+      throw new AppError(
+        ErrorCode.DATABASE_ERROR,
+        "Database error occurred",
+        HttpStatusCode.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async getProfessorByUserId(userID: number): Promise<Professor | null> {
+    try {
+      const professor = await this.db.professor.findUnique({
+        where: { userID },
+        include: {
+          user: { include: { prefix: true, imageMedia: true } },
+        },
+      });
+      return professor as unknown as Professor | null;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === "P2025") {
@@ -95,8 +114,7 @@ export class ProfessorRepository implements IProfessorRepository {
       where: { id: professorID },
       data,
       include: {
-        user: true,
-        academicPosition: true,
+        user: { include: { prefix: true, imageMedia: true } },
       },
     });
     return professor as unknown as Professor;
@@ -128,8 +146,7 @@ export class ProfessorRepository implements IProfessorRepository {
           deletedAt: new Date(),
         },
         include: {
-          user: true,
-          academicPosition: true,
+          user: { include: { prefix: true, imageMedia: true } },
         },
       });
       return professor as unknown as Professor;

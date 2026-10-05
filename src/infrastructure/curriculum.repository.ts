@@ -1,5 +1,5 @@
 import { ICurriculumRepository } from "../modules/curriculums/domain/curriculum.repository";
-import { PrismaClient, Prisma } from "../generated/prisma/client";
+import { Prisma } from "../generated/prisma/client";
 import {
   Curriculum,
   CurriculumQueryParams,
@@ -11,6 +11,7 @@ import { calculatePagination } from "../core/utils/calculator";
 import { AppError } from "../core/error/app-error";
 import { ErrorCode } from "../core/types/errors";
 import { PrismaInstance } from "../lib/db";
+import { ensureImageMedia } from "./image-media.repository";
 
 export class CurriculumRepository implements ICurriculumRepository {
   constructor(private readonly db: PrismaInstance) {}
@@ -18,10 +19,11 @@ export class CurriculumRepository implements ICurriculumRepository {
   async createCurriculum(
     data: CurriculumCreatePayload,
   ): Promise<Curriculum> {
-    const curriculum = await this.db.curriculum.create({
-      data,
+    const { thumbnailMedia, ...fields } = data;
+    return await this.db.$transaction(async (tx) => {
+      const imageID = thumbnailMedia ? await ensureImageMedia(tx, thumbnailMedia) : null;
+      return tx.curriculum.create({ data: { ...fields, imageID }, include: { imageMedia: true } }) as unknown as Curriculum;
     });
-    return curriculum;
   }
 
   async getCurriculums(query: CurriculumQueryParams): Promise<Curriculum[]> {
@@ -33,6 +35,7 @@ export class CurriculumRepository implements ICurriculumRepository {
         deletedAt: null,
         ...(query.year && { year: query.year }),
       },
+      include: { imageMedia: true },
       orderBy: {
         [orderBy]: sortBy,
       },
@@ -56,6 +59,7 @@ export class CurriculumRepository implements ICurriculumRepository {
         id: id,
         deletedAt: null,
       },
+      include: { imageMedia: true },
     });
     return curriculum;
   }
@@ -64,11 +68,10 @@ export class CurriculumRepository implements ICurriculumRepository {
     id: number,
     data: CurriculumUpdatePayload,
   ): Promise<Curriculum> {
-    const curriculum = await this.db.curriculum.update({
-      where: {
-        id: id,
-      },
-      data,
+    const { thumbnailMedia, ...fields } = data;
+    const curriculum = await this.db.$transaction(async (tx) => {
+      const imageID = thumbnailMedia ? await ensureImageMedia(tx, thumbnailMedia) : undefined;
+      return tx.curriculum.update({ where: { id }, data: { ...fields, ...(imageID !== undefined && { imageID }) }, include: { imageMedia: true } });
     });
     return curriculum;
   }
@@ -80,6 +83,7 @@ export class CurriculumRepository implements ICurriculumRepository {
         data: {
           deletedAt: new Date(),
         },
+        include: { imageMedia: true },
       });
       return curriculum;
     } catch (error) {

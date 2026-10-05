@@ -12,6 +12,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["public", "auth"]
 }
 
 model Role {
@@ -21,13 +22,12 @@ model Role {
   projectMembers ProjectMember[]
 
   @@map("roles")
+  @@schema("public")
 }
 
 model UserRole {
   id        Int       @id @default(autoincrement()) @map("id")
-  createdBy Int       @map("created_by")
   roleID    Int       @map("role_id")
-  updatedBy Int       @map("updated_by")
   userID    Int       @map("user_id")
   createdAt DateTime  @default(now()) @map("created_at")
   deletedAt DateTime? @map("deleted_at")
@@ -37,30 +37,132 @@ model UserRole {
 
   @@unique([userID, roleID])
   @@map("user_roles")
+  @@schema("public")
 }
 
 model User {
-  id          Int       @id @default(autoincrement()) @map("id")
-  email       String    @unique @map("email")
-  password    String?   @map("password")
-  firstNameEn String?   @map("first_name_en")
-  firstNameTh String    @map("first_name_th")
-  imageUrl    String?   @map("image_url")
-  lastNameEn  String?   @map("last_name_en")
-  lastNameTh  String    @map("last_name_th")
-  nickName    String?   @map("nick_name")
-  createdBy   Int       @map("created_by")
-  updatedBy   Int?      @map("updated_by")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  deletedAt   DateTime? @map("deleted_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id            Int       @id @default(autoincrement()) @map("id")
+  email         String    @unique @map("email")
+  prefixID      Int?      @map("prefix_id")
+  emailVerified Boolean   @default(false) @map("email_verified")
+  firstNameEn   String?   @map("first_name_en")
+  firstNameTh   String    @map("first_name_th")
+  imageUrl      String?   @map("image_url")
+  imageID       Int?      @map("image_id")
+  imageFocalPointX Float? @map("image_focal_point_x")
+  imageFocalPointY Float? @map("image_focal_point_y")
+  lastNameEn    String?   @map("last_name_en")
+  lastNameTh    String    @map("last_name_th")
+  nickName      String?   @map("nick_name")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  deletedAt     DateTime? @map("deleted_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
+  prefix         Prefix?     @relation(fields: [prefixID], references: [id])
+  imageMedia     ImageMedia? @relation(fields: [imageID], references: [id])
   userRoles      UserRole[]
   student        Student?
   professor      Professor?
   projectMembers ProjectMember[]
+  authUser       AuthUser?
 
   @@map("users")
+  @@schema("public")
+}
+
+model ImageMedia {
+  id          Int       @id @default(autoincrement()) @map("id")
+  provider    String    @map("provider")
+  bucket      String?   @map("bucket")
+  fileKey     String?   @map("file_key")
+  imageUrl    String    @unique @map("image_url")
+  fileName    String?   @map("file_name")
+  contentType String?   @map("content_type")
+  fileSize    Int?      @map("file_size")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  users       User[]
+  newsImages  NewsImage[]
+  projects    Project[]
+  projectImages ProjectImage[]
+  curriculums Curriculum[]
+  classBooks  ClassBook[]
+
+  @@unique([provider, bucket, fileKey])
+  @@map("image_media")
+  @@schema("public")
+}
+
+// Better Auth identity is kept separate from the application profile. Its ID
+// is also the public.users ID so existing session and API identifiers survive.
+model AuthUser {
+  id             Int       @id @map("id")
+  name           String    @map("name")
+  email          String    @unique @map("email")
+  emailVerified  Boolean   @default(false) @map("email_verified")
+  image          String?   @map("image")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  applicationUser User     @relation(fields: [id], references: [id], onDelete: Cascade)
+  sessions       Session[]
+  accounts       Account[]
+
+  @@map("users")
+  @@schema("auth")
+}
+
+// Better Auth keeps credentials, sessions and verification tokens separate
+// from the application's existing user profile and role tables.
+model Session {
+  id        Int       @id @default(autoincrement()) @map("id")
+  userID    Int       @map("user_id")
+  token     String    @unique @map("token")
+  expiresAt DateTime  @map("expires_at")
+  ipAddress String?   @map("ip_address")
+  userAgent String?   @map("user_agent")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  user      AuthUser  @relation(fields: [userID], references: [id], onDelete: Cascade)
+
+  @@index([userID])
+  @@map("auth_sessions")
+  @@schema("auth")
+}
+
+model Account {
+  id                    Int       @id @default(autoincrement()) @map("id")
+  userID                Int       @map("user_id")
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  scope                 String?   @map("scope")
+  idToken               String?   @map("id_token")
+  password              String?   @map("password")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  user                  AuthUser  @relation(fields: [userID], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userID])
+  @@map("auth_accounts")
+  @@schema("auth")
+}
+
+model Verification {
+  id         Int      @id @default(autoincrement()) @map("id")
+  identifier String   @map("identifier")
+  value      String   @map("value")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([identifier])
+  @@map("auth_verifications")
+  @@schema("auth")
 }
 
 model TageGroups {
@@ -69,6 +171,7 @@ model TageGroups {
   tags Tag[]
 
   @@map("tag_groups")
+  @@schema("public")
 }
 
 model Tag {
@@ -81,27 +184,109 @@ model Tag {
   projectTags  ProjectTag[]
 
   @@map("tags")
+  @@schema("public")
 }
 
 model News {
   id           Int            @id @default(autoincrement()) @map("id")
   title        String         @map("title")
-  image        String         @map("image")
   thumbnail    String?        @map("thumbnail")
-  highlight    String?        @map("highlight")
+  thumbnailFocalPointX Float? @map("thumbnail_focal_point_x")
+  thumbnailFocalPointY Float? @map("thumbnail_focal_point_y")
   detail       String         @map("detail")
   startDate    DateTime       @map("start_date")
   dueDate      DateTime?      @map("due_date")
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at")
   deletedAt    DateTime?      @map("deleted_at")
-  createdBy    Int            @map("created_by")
-  updatedBy    Int            @map("updated_by")
   tagID        Int            @map("tag_id")
   tag          Tag            @relation(fields: [tagID], references: [id])
+  newsCategoryID Int?          @map("news_category_id")
+  newsCategory   NewsCategory? @relation(fields: [newsCategoryID], references: [id])
+  eventStartAt   DateTime?      @map("event_start_at")
+  eventEndAt     DateTime?      @map("event_end_at")
   newsFeatures NewsFeatures[]
+  newsAdditionalImages NewsAdditionalImage[]
+  newsImages   NewsImage[]
+  newsBulletins NewsBulletin[]
 
   @@map("news")
+  @@schema("public")
+}
+
+model NewsCategory {
+  id   Int    @id @default(autoincrement()) @map("id")
+  code String @unique @map("code")
+  name String @map("name")
+  news News[]
+
+  @@map("news_categories")
+  @@schema("public")
+}
+
+model NewsImage {
+  id          Int           @id @default(autoincrement()) @map("id")
+  newsID      Int           @map("news_id")
+  imageID     Int           @map("image_id")
+  imageType   NewsImageType @map("image_type")
+  focalPointX Float?        @map("focal_point_x")
+  focalPointY Float?        @map("focal_point_y")
+  sortOrder   Int           @default(0) @map("sort_order")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  deletedAt   DateTime?     @map("deleted_at")
+  news        News          @relation(fields: [newsID], references: [id])
+  image       ImageMedia    @relation(fields: [imageID], references: [id])
+
+  @@unique([newsID, imageID, imageType])
+  @@index([newsID])
+  @@index([imageID])
+  @@map("news_images")
+  @@schema("public")
+}
+
+model NewsBulletin {
+  id        Int              @id @default(autoincrement()) @map("id")
+  newsID    Int              @map("news_id")
+  type      NewsBulletinType @map("type")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+  deletedAt DateTime?        @map("deleted_at")
+  news      News             @relation(fields: [newsID], references: [id])
+
+  @@unique([newsID, type])
+  @@map("news_bulletins")
+  @@schema("public")
+}
+
+enum NewsImageType {
+  CARD
+  THUMBNAIL
+  DETAIL
+
+  @@map("news_image_type")
+  @@schema("public")
+}
+
+enum NewsBulletinType {
+  HIGHLIGHT
+  ANNOUNCEMENT
+
+  @@map("news_bulletin_type")
+  @@schema("public")
+}
+
+model NewsAdditionalImage {
+  id            Int       @id @default(autoincrement()) @map("id")
+  newsID        Int       @map("news_id")
+  imageUrl      String    @map("image_url")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+  news          News      @relation(fields: [newsID], references: [id])
+
+  @@map("news_additional_images")
+  @@schema("public")
 }
 
 model Student {
@@ -117,12 +302,11 @@ model Student {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
-  createdBy   Int       @map("created_by")
-  updatedBy   Int       @map("updated_by")
   user        User      @relation(fields: [userID], references: [id])
   classBook   ClassBook @relation(fields: [classBookID], references: [id])
 
   @@map("students")
+  @@schema("public")
 }
 
 model Curriculum {
@@ -132,15 +316,18 @@ model Curriculum {
   documentURL  String      @map("document_url")
   description  String      @map("description")
   thumbnailURL String      @map("thumbnail_url")
-  createdBy    Int         @map("created_by")
-  updatedBy    Int         @map("updated_by")
+  imageID      Int?        @map("image_id")
+  thumbnailFocalPointX Float? @map("thumbnail_focal_point_x")
+  thumbnailFocalPointY Float? @map("thumbnail_focal_point_y")
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
   deletedAt    DateTime?   @map("deleted_at")
   courses      Course[]
   classBooks   ClassBook[]
+  imageMedia   ImageMedia? @relation(fields: [imageID], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@map("curriculums")
+  @@schema("public")
 }
 
 model Professor {
@@ -150,17 +337,15 @@ model Professor {
   phone              String    @map("phone")
   expertFields       String?   @map("expert_fields")
   educations         String?   @map("educations")
-  createdBy          Int       @map("created_by")
-  updatedBy          Int       @map("updated_by")
-  academicPositionID Int       @map("academic_position_id")
+  researchProfile    String?   @map("research_profile")
   createdAt          DateTime  @default(now()) @map("created_at")
   deletedAt          DateTime? @map("deleted_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  user             User             @relation(fields: [userID], references: [id])
-  academicPosition AcademicPosition @relation(fields: [academicPositionID], references: [id])
+  user User @relation(fields: [userID], references: [id])
 
   @@map("professors")
+  @@schema("public")
 }
 
 model TypeCourse {
@@ -170,6 +355,7 @@ model TypeCourse {
   courses     Course[]
 
   @@map("type_courses")
+  @@schema("public")
 }
 
 model Course {
@@ -181,8 +367,6 @@ model Course {
   credits      String     @map("credits")
   typeCourseID Int        @map("type_course_id")
   curriculumID Int        @map("curriculum_id")
-  createdBy    Int        @map("created_by")
-  updatedBy    Int        @map("updated_by")
   createdAt    DateTime   @default(now()) @map("created_at")
   deletedAt    DateTime?  @map("deleted_at")  
   updatedAt    DateTime   @updatedAt @map("updated_at")
@@ -193,14 +377,13 @@ model Course {
   projectCourses ProjectCourse[]
 
   @@map("courses")
+  @@schema("public")
 }
 
 model PreCourse {
   id          Int      @id @default(autoincrement())
   courseID    Int      @map("course_id")
   preCourseID Int      @map("pre_course_id")
-  createdBy   Int      @map("created_by")
-  updatedBy   Int      @map("updated_by")
   createdAt   DateTime @default(now()) @map("created_at")
   deletedAt   DateTime? @map("deleted_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -211,6 +394,7 @@ model PreCourse {
   @@unique([courseID, preCourseID])
 
   @@map("pre_courses")
+  @@schema("public")
 }
 
 
@@ -219,16 +403,19 @@ model ClassBook {
   classof           String     @unique @map("classof")
   firstYearAcademic String     @map("first_year_academic")
   thumbnailURL      String     @map("thumbnail_url")
+  imageID           Int?       @map("image_id")
+  imageFocalPointX  Float?     @map("image_focal_point_x")
+  imageFocalPointY  Float?     @map("image_focal_point_y")
   curriculumID      Int        @map("curriculum_id")
   createdAt         DateTime   @default(now()) @map("created_at")
   updatedAt         DateTime   @updatedAt @map("updated_at")
   deletedAt         DateTime?  @map("deleted_at")
-  createdBy         Int        @map("created_by")
-  updatedBy         Int        @map("updated_by")
   curriculum        Curriculum @relation(fields: [curriculumID], references: [id])
   students          Student[]
+  imageMedia        ImageMedia? @relation(fields: [imageID], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@map("class_books")
+  @@schema("public")
 }
 
 // model Education {
@@ -236,8 +423,6 @@ model ClassBook {
 //   education   String     @map("education")
 //   professor   Professor? @relation(fields: [professorID], references: [id])
 //   professorID Int        @map("professor_id")
-//   createdBy   Int        @map("created_by")
-//   updatedBy   Int        @map("updated_by")
 //   createdAt   DateTime   @default(now()) @map("created_at")
 //   updatedAt   DateTime   @updatedAt @map("updated_at")
 //   deletedAt   DateTime?  @map("deleted_at")
@@ -245,30 +430,17 @@ model ClassBook {
 //   @@map("education")
 // }
 
-model AcademicPosition {
+model Prefix {
   id          Int         @id @default(autoincrement()) @map("id")
   sequence    Int         @unique @default(0) @map("sequence")
   nameTh      String      @unique @map("name_th")
   nameEn      String      @map("name_en")
   shortNameTh String      @map("short_name_th")
   shortNameEn String      @map("short_name_en")
-  professors  Professor[]
+  users       User[]
 
-  @@map("academic_positions")
-}
-
-model ForgetPasswordCredential {
-  id             Int       @id @default(autoincrement()) @map("id")
-  refferenceCode String    @unique @default(uuid()) @map("reference_code") @db.Uuid
-  userID         Int       @map("user_id")
-  expiredAt      DateTime  @default(dbgenerated("NOW() + INTERVAL '5 minutes'")) @map("expired_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-  deletedAt      DateTime? @map("deleted_at")
-  createdBy      Int       @map("created_by")
-  updatedBy      Int       @map("updated_by")
-
-  @@map("forget_password_credentials")
+  @@map("prefixes")
+  @@schema("public")
 }
 
 model NewsFeatures {
@@ -279,19 +451,23 @@ model NewsFeatures {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
-  createdBy    Int       @map("created_by")
-  updatedBy    Int       @map("updated_by")
   news         News      @relation(fields: [newsID], references: [id])
   tag          Tag       @relation(fields: [tagID], references: [id])
+  thumbnailFocalPointX Float? @map("thumbnail_focal_point_x")
+  thumbnailFocalPointY Float? @map("thumbnail_focal_point_y")
 
   @@unique([newsID, tagID])
   @@map("news_features")
+  @@schema("public")
 }
 
 model Project {
   id              Int             @id @default(autoincrement()) @map("id")
   title           String          @map("title")
   thumbnailURL    String          @map("thumbnail_url")
+  imageID         Int?            @map("image_id")
+  thumbnailFocalPointX Float?     @map("thumbnail_focal_point_x")
+  thumbnailFocalPointY Float?     @map("thumbnail_focal_point_y")
   assetsURL       String          @map("assets_url")
   techStacks      String          @map("tech_stacks")
   details         String          @map("details")
@@ -303,13 +479,31 @@ model Project {
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
   deletedAt       DateTime?       @map("deleted_at")
-  createdBy       Int             @map("created_by")
-  updatedBy       Int             @map("updated_by")
   projectTags     ProjectTag[]
   projectMembers  ProjectMember[]
   projectCourses  ProjectCourse[]
+  imageMedia      ImageMedia?     @relation(fields: [imageID], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  images          ProjectImage[]
 
   @@map("projects")
+  @@schema("public")
+}
+
+model ProjectImage {
+  id        Int        @id @default(autoincrement()) @map("id")
+  projectID Int        @map("project_id")
+  imageID   Int        @map("image_id")
+  sortOrder Int        @default(0) @map("sort_order")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  deletedAt DateTime?  @map("deleted_at")
+  project   Project    @relation(fields: [projectID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  image     ImageMedia @relation(fields: [imageID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([projectID, sortOrder])
+  @@index([imageID])
+  @@map("project_images")
+  @@schema("public")
 }
 
 model ProjectTag {
@@ -319,14 +513,13 @@ model ProjectTag {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
-  createdBy Int       @map("created_by")
-  updatedBy Int       @map("updated_by")
 
   project Project @relation(fields: [projectID], references: [id])
   tag     Tag     @relation(fields: [tagID], references: [id])
 
   @@unique([projectID, tagID])
   @@map("project_tags")
+  @@schema("public")
 }
 
 model ProjectMember {
@@ -337,8 +530,6 @@ model ProjectMember {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
-  createdBy Int       @map("created_by")
-  updatedBy Int       @map("updated_by")
 
   project Project @relation(fields: [projectID], references: [id])
   user    User    @relation(fields: [userID], references: [id])
@@ -346,6 +537,7 @@ model ProjectMember {
 
   @@unique([projectID, userID])
   @@map("project_members")
+  @@schema("public")
 }
 
 model ProjectCourse {
@@ -355,12 +547,11 @@ model ProjectCourse {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
-  createdBy Int       @map("created_by")
-  updatedBy Int       @map("updated_by")
 
   project Project @relation(fields: [projectID], references: [id])
   course  Course    @relation(fields: [courseID], references: [id])
 
   @@unique([projectID, courseID])
   @@map("project_courses")
+  @@schema("public")
 }

@@ -1,50 +1,57 @@
-import { SupabaseService } from "../../core/utils/supabase";
-import { Prisma } from "../../generated/prisma/client";
 import {
   CreateStudentDTO,
   StudentDTO,
-  Student,
   StudentQueryParams,
   StudentUpdateDTO,
-  CreaetListStudentDTO,
   StudentCreatePayload,
   StudentUpdatePayload,
+  CreateStudent,
 } from "./domain/student";
+import { parse } from "csv-parse/sync";
+import * as xlsx from "xlsx";
+import { Value } from "@sinclair/typebox/value";
 import { IStudentRepository } from "./domain/student.repository";
-import { IUserRepository } from "../users/domain/user.repository";
 import { CreateUserModel, UpdateUserModel } from "../users/domain/user";
 import { AppError } from "../../core/error/app-error";
 import { ErrorCode } from "../../core/types/errors";
 import { IStudentFactory } from "./student.factory";
-import { HttpStatusCode } from "../../core/types/http";
 import { PageableType } from "../../core/models";
+import { IUnitOfWork } from "../../core/uow/uow.interface";
+import { ProfileImageStorage, StoredImage } from "../../infrastructure/profile-image-storage";
+import { validateProfileImage } from "../users/profile-image-validation";
 
 interface IStudentService {
-  createStudent(data: CreateStudentDTO, createdBy: number): Promise<StudentDTO>;
+  createStudent(data: CreateStudentDTO): Promise<StudentDTO>;
   getStudents(
     query: StudentQueryParams,
   ): Promise<PageableType<typeof StudentDTO>>;
   getStudentById(id: number): Promise<StudentDTO | null>;
   deleteStudent(id: number): Promise<StudentDTO>;
-  updateStudent(studentID: number, data: StudentUpdateDTO): Promise<StudentDTO>;
-  createStudentBatch(data: CreaetListStudentDTO): Promise<StudentDTO[]>;
+  updateStudent(
+    studentID: number,
+    data: StudentUpdateDTO,
+    actor: { userID: number; isAdmin: boolean },
+  ): Promise<StudentDTO>;
+  importStudentsFromFile(
+    file: File,
+    classBookID: number,
+  ): Promise<void>;
 }
 
 export class StudentService implements IStudentService {
   constructor(
     private readonly studentRepository: IStudentRepository,
-    private readonly userRepository: IUserRepository,
-    private readonly storage: SupabaseService,
+    private readonly storage: ProfileImageStorage,
     private readonly studentFactory: IStudentFactory,
-    // private readonly uowRepository: IUnitOfWork,
-  ) {}
+    private readonly unitOfWork: IUnitOfWork,
+  ) { }
 
   async createStudent(
     data: CreateStudentDTO,
-    createdBy: number,
   ): Promise<StudentDTO> {
     const {
       imageFile,
+      prefixID,
       email,
       nickName,
       firstNameTh,
@@ -52,71 +59,62 @@ export class StudentService implements IStudentService {
       firstNameEn,
       lastNameEn,
       skills,
+      imageFocalPointX,
+      imageFocalPointY,
       ...studentData
     } = data;
-    let imagePath: string | null = null;
+    let storedImage: StoredImage | null = null;
+    let imageContentType: string | null = null;
     try {
       if (imageFile) {
-        imagePath = await this.storage.uploadFile(imageFile, "students");
+        imageContentType = await validateProfileImage(imageFile);
+        storedImage = await this.storage.upload(imageFile, imageContentType);
       }
 
-      const rawUserData: CreateUserModel = {
-        email,
-        firstNameTh,
-        lastNameTh,
-        nickName,
-        firstNameEn,
-        lastNameEn,
-        password: null,
-        imageUrl: imagePath,
-        createdBy: createdBy || 0,
-        updatedBy: createdBy || 0,
-      };
-
-      const user = await this.userRepository.createUser(rawUserData);
-
-      if (!user) {
-        throw new AppError(
-          ErrorCode.DATABASE_ERROR,
-          "Failed to create user for student",
-        );
-      }
-
-      const role = await this.userRepository.assignUserRole({
-        userID: user.id,
-        roleID: 2,
-        createdBy: createdBy || 0,
-        updatedBy: createdBy || 0,
+      const student = await this.unitOfWork.runInTransaction(async (tx) => {
+        const image = storedImage
+          ? await tx.imageMedia.create({
+              ...storedImage,
+              fileName: imageFile!.name,
+              contentType: imageContentType!,
+              fileSize: imageFile!.size,
+            })
+          : null;
+        const rawUserData: CreateUserModel = {
+          prefixID,
+          email,
+          firstNameTh,
+          lastNameTh,
+          nickName,
+          firstNameEn,
+          lastNameEn,
+          imageID: image?.id ?? null,
+          imageUrl: storedImage?.imageUrl ?? null,
+          imageFocalPointX,
+          imageFocalPointY,
+        };
+        const user = await tx.user.createUser(rawUserData);
+        await tx.user.assignUserRole({ userID: user.id, roleID: 2 });
+        const rawStudentData: StudentCreatePayload = {
+          ...studentData,
+          skills: skills ? skills.join(",") : null,
+          userID: user.id,
+        };
+        const student = await tx.student.createStudent(rawStudentData);
+        return this.studentFactory.MapStudentToDTO(student);
       });
-
-      if (!role) {
-        throw new AppError(
-          ErrorCode.DATABASE_ERROR,
-          "Failed to assign role to student user",
-        );
-      }
-
-      const rawStudentData: StudentCreatePayload = {
-        ...studentData,
-        skills: skills ? skills.join(",") : null,
-        createdBy: createdBy || 0,
-        updatedBy: createdBy || 0,
-        userID: user.id,
-      };
-
-      const student =
-        await this.studentRepository.createStudent(rawStudentData);
-
-      if (!student) {
-        throw new AppError(
-          ErrorCode.DATABASE_ERROR,
-          "Failed to create student",
-        );
-      }
-
-      return this.studentFactory.MapStudentToDTO(student);
+      return student;
     } catch (error) {
-      console.log(error);
+      if (storedImage) {
+        await this.storage
+          .delete(storedImage.bucket, storedImage.fileKey)
+          .catch((cleanupError) => {
+            console.error("Failed to clean up profile image", {
+              ...storedImage,
+              error: cleanupError,
+            });
+          });
+      }
       throw error;
     }
   }
@@ -177,6 +175,7 @@ export class StudentService implements IStudentService {
   async updateStudent(
     studentID: number,
     data: StudentUpdateDTO,
+    actor: { userID: number; isAdmin: boolean },
   ): Promise<StudentDTO> {
     const {
       imageFile,
@@ -187,20 +186,27 @@ export class StudentService implements IStudentService {
       instagram,
       classBookID,
       skills,
+      imageFocalPointX,
+      imageFocalPointY,
       ...userData
     } = data;
-    let imagePath: string | undefined = undefined;
-    let student: Student;
+    if (!actor.isAdmin) {
+      const existing = await this.studentRepository.getStudentById(studentID);
+      if (!existing) {
+        throw new AppError(ErrorCode.NOT_FOUND_ERROR, "Student not found", 404);
+      }
+      if (existing.userID !== actor.userID) {
+        throw new AppError(ErrorCode.AUTHORIZATION_ERROR, "Forbidden", 403);
+      }
+    }
+
+    let storedImage: StoredImage | null = null;
+    let imageContentType: string | null = null;
     try {
       if (imageFile) {
-        imagePath = await this.storage.uploadFile(imageFile, "students");
+        imageContentType = await validateProfileImage(imageFile);
+        storedImage = await this.storage.upload(imageFile, imageContentType);
       }
-
-      const updatedUserData: UpdateUserModel = {
-        ...(imagePath && { imageUrl: imagePath }),
-        ...userData,
-        updatedBy: 0,
-      };
 
       const updateStudentData: StudentUpdatePayload = {
         studentCode,
@@ -210,40 +216,143 @@ export class StudentService implements IStudentService {
         instagram,
         classBookID,
         skills: skills ? skills.join(",") : null,
-        updatedBy: 0,
       };
 
-      student = await this.studentRepository.updateStudent(
-        studentID,
-        updateStudentData,
-      );
-
-      const updateUser = await this.userRepository.updateUser(
-        student.userID,
-        updatedUserData,
-      );
-
-      if (!updateUser) {
-        throw new AppError(
-          ErrorCode.DATABASE_ERROR,
-          "Failed to update user for student",
-        );
-      }
-
-      student.user = updateUser;
-
-      return this.studentFactory.MapStudentToDTO(student);
+      const student = await this.unitOfWork.runInTransaction(async (tx) => {
+        const image = storedImage
+          ? await tx.imageMedia.create({
+              ...storedImage,
+              fileName: imageFile!.name,
+              contentType: imageContentType!,
+              fileSize: imageFile!.size,
+            })
+          : null;
+        const updatedUserData: UpdateUserModel = {
+          ...userData,
+          ...(image && {
+            imageID: image.id,
+            imageUrl: storedImage!.imageUrl,
+            imageFocalPointX: imageFocalPointX ?? null,
+            imageFocalPointY: imageFocalPointY ?? null,
+          }),
+          ...(!image && { imageFocalPointX, imageFocalPointY }),
+        };
+        const updated = await tx.student.updateStudent(studentID, updateStudentData);
+        const updateUser = await tx.user.updateUser(updated.userID, updatedUserData);
+        updated.user = updateUser;
+        return this.studentFactory.MapStudentToDTO(updated);
+      });
+      return student;
     } catch (error) {
-      console.log(error);
+      if (storedImage) {
+        await this.storage
+          .delete(storedImage.bucket, storedImage.fileKey)
+          .catch((cleanupError) => {
+            console.error("Failed to clean up profile image", {
+              ...storedImage,
+              error: cleanupError,
+            });
+          });
+      }
       throw error;
     }
   }
 
-  async createStudentBatch(data: CreaetListStudentDTO): Promise<StudentDTO[]> {
-    const { classBookID, students } = data;
-    const studentsDB: Student[] = [];
+  async importStudentsFromFile(
+    file: File,
+    classBookID: number,
+  ): Promise<void> {
+    const fileName = file.name.toLowerCase();
+    const isCSV = fileName.endsWith(".csv") || file.type === "text/csv";
+    const isExcel = fileName.endsWith(".xlsx") || fileName.endsWith(".xls");
+
+    if (!isCSV && !isExcel) {
+      throw new AppError(
+        ErrorCode.VALIDATION_ERROR,
+        "Invalid file format. Only CSV and Excel are allowed.",
+        400,
+      );
+    }
+
+    let rawRecords: Record<string, unknown>[];
     try {
-      for (const studentData of students) {
+      if (isCSV) {
+        const text = await file.text();
+        rawRecords = parse(text, {
+          bom: true,
+          columns: true,
+          skip_empty_lines: true,
+          trim: true,
+        });
+      } else {
+        const buffer = await file.arrayBuffer();
+        const workbook = xlsx.read(buffer, { type: "buffer" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = sheetName ? workbook.Sheets[sheetName] : undefined;
+        if (!sheet) {
+          throw new Error("The spreadsheet has no readable worksheet.");
+        }
+        rawRecords = xlsx.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+          raw: false,
+          defval: "",
+        });
+      }
+    } catch {
+      throw new AppError(
+        ErrorCode.VALIDATION_ERROR,
+        "The uploaded file could not be read.",
+        400,
+      );
+    }
+
+    const records = rawRecords.map((row) =>
+      Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [
+          key.trim(),
+          String(value).trim(),
+        ]),
+      ),
+    );
+
+    if (records.length === 0) {
+      throw new AppError(
+        ErrorCode.VALIDATION_ERROR,
+        "File is empty or contains no valid data rows.",
+        400,
+      );
+    }
+
+    const validRecords: CreateStudent[] = [];
+    for (const row of records) {
+      const parsedRow = {
+        studentCode: row.studentCode,
+        linkedin: row.linkedin || undefined,
+        github: row.github || undefined,
+        facebook: row.facebook || undefined,
+        instagram: row.instagram || undefined,
+        firstNameTh: row.firstNameTh,
+        lastNameTh: row.lastNameTh,
+        firstNameEn: row.firstNameEn || undefined,
+        lastNameEn: row.lastNameEn || undefined,
+        email: row.email,
+        nickName: row.nickName || undefined,
+        skills: row.skills
+          ? row.skills
+            .split(",")
+            .map((skill) => skill.trim())
+            .filter(Boolean)
+          : undefined,
+      };
+
+      if (!Value.Check(CreateStudent, parsedRow)) {
+        throw new AppError(ErrorCode.VALIDATION_ERROR, "Invalid format", 400);
+      }
+
+      validRecords.push(parsedRow as CreateStudent);
+    }
+
+    await this.unitOfWork.runInTransaction(async (transaction) => {
+      for (const record of validRecords) {
         const {
           linkedin,
           github,
@@ -252,59 +361,31 @@ export class StudentService implements IStudentService {
           studentCode,
           skills,
           ...userData
-        } = studentData;
+        } = record;
 
         const rawUserData: CreateUserModel = {
           ...userData,
-          createdBy: 0,
-          updatedBy: 0,
         };
 
-        const user = await this.userRepository.createUser(rawUserData);
-
-        if (!user) {
-          throw new AppError(
-            ErrorCode.DATABASE_ERROR,
-            "Failed to create user for student",
-            HttpStatusCode.INTERNAL_SERVER_ERROR,
-          );
-        }
+        const user = await transaction.user.createUser(rawUserData);
+        await transaction.user.assignUserRole({
+          userID: user.id,
+          roleID: 2,
+        });
 
         const rawStudentData: StudentCreatePayload = {
-          linkedin,
-          github,
-          facebook,
-          instagram,
+          linkedin: linkedin || null,
+          github: github || null,
+          facebook: facebook || null,
+          instagram: instagram || null,
           studentCode,
           classBookID,
           skills: skills ? skills.join(",") : null,
-          createdBy: 0,
-          updatedBy: 0,
           userID: user.id,
         };
 
-        const student =
-          await this.studentRepository.createStudent(rawStudentData);
-
-        if (!student) {
-          throw new AppError(
-            ErrorCode.DATABASE_ERROR,
-            "Failed to create student",
-            HttpStatusCode.INTERNAL_SERVER_ERROR,
-          );
-        }
-
-        studentsDB.push(student);
+        await transaction.student.createStudent(rawStudentData);
       }
-
-      return this.studentFactory.MapStudentListToDTO(studentsDB);
-    } catch (error) {
-      console.log(error);
-      throw new AppError(
-        ErrorCode.DATABASE_ERROR,
-        "Failed to create students batch",
-        HttpStatusCode.INTERNAL_SERVER_ERROR,
-      );
-    }
+    });
   }
 }

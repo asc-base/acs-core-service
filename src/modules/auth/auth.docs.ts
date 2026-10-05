@@ -5,7 +5,6 @@ import {
   CreateCredentialsDTO,
 } from "./domain/auth";
 import { mapResponse } from "../../core/interceptor/response";
-import { log } from "node:console";
 
 export const authDocs = {
   login: {
@@ -15,46 +14,35 @@ export const authDocs = {
       tags: ["Auth"],
     },
     body: AuthRequestDTO,
-    response: mapResponse(AuthResponseDTO),
+    response: {
+      200: mapResponse(AuthResponseDTO),
+    },
   },
   logout: {
     detail: {
-      description: "Logout a user by clearing the access token cookie",   
+      description: "Logout a user by clearing the access token cookie",
       summary: "User logout",
       tags: ["Auth"],
     },
   },
   createCredentials: {
     detail: {
-      description: "Create credentials for a user to reset their password",
-      summary: "Create credentials for password reset",
+      description:
+        "Request a Better Auth password reset link without exposing its token",
+      summary: "Request password reset",
       tags: ["Auth"],
     },
     body: CreateCredentialsDTO,
   },
-  getCredentialsByReferenceCode: {
-    detail: {
-      description:
-        "Get credentials using the reference code sent to the user's email",
-      summary: "Get credentials by reference code",
-      tags: ["Auth"],
-    },
-    params: t.Object({
-      referenceCode: t.String({
-        description: "The reference code sent to the user's email",
-        examples: ["abc123def456"],
-      }),
-    }),
-  },
   resetPassword: {
     detail: {
-      description: "Reset the user's password using the reference code",
+      description: "Reset the user's password using a Better Auth reset token",
       summary: "Reset password",
       tags: ["Auth"],
     },
     params: t.Object({
-      referenceCode: t.String({
-        description: "The reference code sent to the user's email",
+      token: t.String({
+        description: "The Better Auth reset token received by the frontend",
         examples: ["abc123def456"],
       }),
     }),

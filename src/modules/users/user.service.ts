@@ -1,38 +1,40 @@
-import { CreateSuperUserDTO, UserDTO } from "./domain/user";
+import { hashPassword } from "better-auth/crypto";
+import { CreateSuperUserDTO, UserDTO, UserProfileDTO } from "./domain/user";
 import { IUserRepository } from "./domain/user.repository";
 import { IUserFactory } from "./user.factory";
+import { IAuthRepository } from "../auth/domain/auth.repository";
 
 export interface IUserService {
   createSuperUser(data: CreateSuperUserDTO): Promise<UserDTO>;
   getUsers(): Promise<UserDTO[]>;
   getUserById(id: number): Promise<UserDTO | null>;
+  getUserProfile(id: number): Promise<UserProfileDTO | null>;
 }
 
 export class UserService implements IUserService {
   constructor(
     private readonly userRepository: IUserRepository,
     private readonly userFactory: IUserFactory,
+    private readonly authRepository: IAuthRepository,
   ) {}
 
   async createSuperUser(data: CreateSuperUserDTO): Promise<UserDTO> {
-    const hashedPassword = await Bun.password.hash(data.password);
+    const { password, ...userData } = data;
+    const hashedPassword = await hashPassword(password);
     const user = await this.userRepository.createUser({
-      ...data,
-      password: hashedPassword ?? null,
-      createdBy: 0,
-      updatedBy: 0,
+      ...userData,
     });
 
     const userRoles = await this.userRepository.assignUserRole({
       userID: user.id,
       roleID: 1,
-      createdBy: 0,
-      updatedBy: 0,
     });
 
     if (!userRoles) {
       throw new Error("Failed to assign superuser role");
     }
+
+    await this.authRepository.syncCredentialAccount(user.id, hashedPassword);
 
     return this.userFactory.mapUserToDTO(user);
   }
@@ -49,5 +51,14 @@ export class UserService implements IUserService {
     }
 
     return this.userFactory.mapUserToDTO(user);
+  }
+
+  async getUserProfile(id: number): Promise<UserProfileDTO | null> {
+    const user = await this.userRepository.getUserById(id);
+    if (!user) {
+      return null;
+    }
+
+    return this.userFactory.mapUserToProfileDTO(user);
   }
 }

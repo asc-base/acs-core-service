@@ -3,7 +3,7 @@ import { IMasterDataRepository } from "../modules/master-data/domain/master-data
 import { Role } from "../core/models/role";
 import { Tag, TagGroup } from "../core/models/tag";
 import { TypeCourse } from "../core/models/type-course";
-import { AcademicPosition } from "../core/models/academic";
+import { Prefix } from "../core/models/prefix";
 
 export class MasterDataRepository implements IMasterDataRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -31,8 +31,12 @@ export class MasterDataRepository implements IMasterDataRepository {
     return typeCourses as TypeCourse[];
   }
 
-  async getAcademicPositions(): Promise<AcademicPosition[]> {
-    const academicPosition = await this.prisma.academicPosition.findMany();
-    return academicPosition as AcademicPosition[];
+  async getPrefixes(): Promise<Prefix[]> {
+    return this.prisma.prefix.findMany({ orderBy: { sequence: "asc" } });
   }
+
+  async getNewsCategories() {
+    return this.prisma.newsCategory.findMany({ orderBy: { id: "asc" } });
+  }
+
 }

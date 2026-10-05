@@ -10,18 +10,20 @@ import { calculatePagination } from "../core/utils/calculator";
 import { AppError } from "../core/error/app-error";
 import { ErrorCode } from "../core/types/errors";
 import { PrismaInstance } from "../lib/db";
+import { ensureImageMedia } from "./image-media.repository";
 
 export class ClassBookRepository implements IClassBookRepository {
   constructor(private readonly db: PrismaInstance) {}
 
   async createClassBook(data: ClassBookCreatePayload): Promise<ClassBook> {
-    const classBook = await this.db.classBook.create({
-      data,
-      include: {
-        curriculum: true,
-      },
+    const { thumbnailMedia, ...fields } = data;
+    return await this.db.$transaction(async (tx) => {
+      const imageID = thumbnailMedia ? await ensureImageMedia(tx, thumbnailMedia) : null;
+      return tx.classBook.create({
+        data: { ...fields, imageID },
+        include: { curriculum: { include: { imageMedia: true } }, imageMedia: true },
+      }) as unknown as ClassBook;
     });
-    return classBook;
   }
 
   async getClassBooks(query: ClassBookQueryParams): Promise<ClassBook[]> {
@@ -52,7 +54,8 @@ export class ClassBookRepository implements IClassBookRepository {
         deletedAt: null,
       },
       include: {
-        curriculum: true,
+        curriculum: { include: { imageMedia: true } },
+        imageMedia: true,
       },
     });
     return classBooks;
@@ -63,7 +66,8 @@ export class ClassBookRepository implements IClassBookRepository {
       const classBook = await this.db.classBook.findUnique({
         where: { id, deletedAt: null },
         include: {
-          curriculum: true,
+          curriculum: { include: { imageMedia: true } },
+          imageMedia: true,
         },
       });
       return classBook;
@@ -100,12 +104,14 @@ export class ClassBookRepository implements IClassBookRepository {
 
   async updateClassBook(classBookID: number, data: ClassBookUpdatePayload): Promise<ClassBook> {
     try {
-      const classBook = await this.db.classBook.update({
-        where: { id: classBookID },
-        data,
-        include: {
-          curriculum: true,
-        },
+      const { thumbnailMedia, ...fields } = data;
+      const classBook = await this.db.$transaction(async (tx) => {
+        const imageID = thumbnailMedia ? await ensureImageMedia(tx, thumbnailMedia) : undefined;
+        return tx.classBook.update({
+          where: { id: classBookID },
+          data: { ...fields, ...(imageID !== undefined && { imageID }) },
+          include: { curriculum: { include: { imageMedia: true } }, imageMedia: true },
+        });
       });
       return classBook as ClassBook;
     } catch (error) {
@@ -130,7 +136,8 @@ export class ClassBookRepository implements IClassBookRepository {
           deletedAt: new Date(),
         },
         include: {
-          curriculum: true,
+          curriculum: { include: { imageMedia: true } },
+          imageMedia: true,
         },
       });
       return classBook as ClassBook;

@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { config } from "../config/config.js";
+import { randomUUID } from "node:crypto";
 
 export class SupabaseService {
   public client: SupabaseClient;
@@ -11,8 +12,8 @@ export class SupabaseService {
     const supabaseKey = config.SUPABASE_KEY;
     const bucketNmae = config.BUCKET_NAME;
 
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error("Supabase URL or Key is missing!");
+    if (!supabaseUrl || !supabaseKey || !bucketNmae || bucketNmae === "undefined") {
+      throw new Error("Supabase URL, key, and bucket are required");
     }
 
     this.bucketName = bucketNmae;
@@ -39,12 +40,43 @@ export class SupabaseService {
       throw new Error(`Upload failed: ${error.message}`);
     }
 
-    // Return Public URL
     const { data: publicUrlData } = this.client.storage
       .from(this.bucketName)
       .getPublicUrl(path);
 
     return publicUrlData.publicUrl;
+  }
+
+  async uploadFileWithMetadata(
+    file: File,
+    folder: string,
+    contentType = file.type,
+  ) {
+    if (!/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(folder)) {
+      throw new Error("Invalid Supabase folder");
+    }
+    const path = `${folder}/${randomUUID()}`;
+
+    const { error } = await this.client.storage
+      .from(this.bucketName)
+      .upload(path, file, {
+        contentType,
+        upsert: false,
+      });
+
+    if (error) {
+      throw new Error(`Upload failed: ${error.message}`);
+    }
+
+    const { data: publicUrlData } = this.client.storage
+      .from(this.bucketName)
+      .getPublicUrl(path);
+
+    return {
+      bucket: this.bucketName,
+      fileKey: path,
+      imageUrl: publicUrlData.publicUrl,
+    };
   }
 
   // --- Helper Methods (ตัวอย่าง: การลบไฟล์) ---

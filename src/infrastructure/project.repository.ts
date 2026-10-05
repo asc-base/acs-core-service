@@ -13,6 +13,7 @@ import { ErrorCode } from "../core/types/errors";
 import { AppError } from "../core/error/app-error";
 import { calculatePagination } from "../core/utils/calculator";
 import { PrismaInstance } from "../lib/db";
+import { ensureImageMedia } from "./image-media.repository";
 
 export class ProjectRepository implements IProjectRepository {
   constructor(
@@ -23,13 +24,21 @@ export class ProjectRepository implements IProjectRepository {
 
     projectData: ProjectCreatePayload,
   ): Promise<Project> {
-    const createdProject = await this.db.project.create({
-      data: {
-        ...projectData,
-      },
+    const { thumbnailMedia, galleryMedia, ...data } = projectData;
+    return await this.db.$transaction(async (tx) => {
+      const imageID = thumbnailMedia ? await ensureImageMedia(tx, thumbnailMedia) : null;
+      const images = await Promise.all((galleryMedia ?? []).map(async ({ sortOrder, ...media }) => ({
+        sortOrder,
+        imageID: await ensureImageMedia(tx, media),
+      })));
+      return await tx.project.create({
+        data: { ...data, imageID, images: { create: images } },
+        include: {
+          imageMedia: true,
+          images: { include: { image: true }, orderBy: { sortOrder: "asc" } },
+        },
+      }) as unknown as Project;
     });
-
-    return createdProject as unknown as Project;
   }
 
   async createProjectTag(
@@ -150,7 +159,7 @@ export class ProjectRepository implements IProjectRepository {
           include: { tag: true }
         },
         projectMembers: {
-          include: { user: true, role: true }
+          include: { user: { include: { imageMedia: true } }, role: true }
         },
         projectCourses: {
           include: {
@@ -161,7 +170,9 @@ export class ProjectRepository implements IProjectRepository {
               }
             }
           }
-        }
+        },
+        imageMedia: true,
+        images: { include: { image: true }, where: { deletedAt: null }, orderBy: { sortOrder: "asc" } },
       }
     });
 
@@ -177,7 +188,7 @@ export class ProjectRepository implements IProjectRepository {
             include: { tag: true },
           },
           projectMembers: {
-            include: { user: true, role: true },
+            include: { user: { include: { imageMedia: true } }, role: true },
           },
           projectCourses: {
             include: {
@@ -188,7 +199,9 @@ export class ProjectRepository implements IProjectRepository {
                 }
               }
             }
-          }
+          },
+          imageMedia: true,
+          images: { include: { image: true }, where: { deletedAt: null }, orderBy: { sortOrder: "asc" } },
         },
       });
       return project as unknown as Project | null;
@@ -240,18 +253,31 @@ export class ProjectRepository implements IProjectRepository {
     id: number,
     projectData: ProjectUpdatePayload,
   ): Promise<Project> {
-    const updatedProject = await this.db.project.update({
-      where: { id, deletedAt: null },
-      data: projectData,
+    const { thumbnailMedia, galleryMedia, ...data } = projectData;
+    const updatedProject = await this.db.$transaction(async (tx) => {
+      const imageID = thumbnailMedia ? await ensureImageMedia(tx, thumbnailMedia) : undefined;
+      const images = await Promise.all((galleryMedia ?? []).map(async ({ sortOrder, ...media }) => ({
+        projectID: id,
+        sortOrder,
+        imageID: await ensureImageMedia(tx, media),
+      })));
+      if (images.length) await tx.projectImage.createMany({ data: images, skipDuplicates: true });
+      return tx.project.update({
+        where: { id, deletedAt: null },
+        data: { ...data, ...(imageID !== undefined && { imageID }) },
+        include: {
+          imageMedia: true,
+          images: { include: { image: true }, where: { deletedAt: null }, orderBy: { sortOrder: "asc" } },
+        },
+      });
     });
     return updatedProject as unknown as Project;
   }
 
-  async deleteProject(id: number, userID: number): Promise<Project> {
+  async deleteProject(id: number): Promise<Project> {
     const deletedProject = await this.db.project.update({
       where: { id, deletedAt: null },
       data: {
-        updatedBy: userID || 0,
         deletedAt: new Date()
       },
     });
