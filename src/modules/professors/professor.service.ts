@@ -273,7 +273,7 @@ export class ProfessorService implements IProfessorService {
           }),
         });
         const updated = await tx.professor.updateProfessor(
-          professorID,
+          existing.id,
           updatedProfessor,
         );
         updated.user = user;

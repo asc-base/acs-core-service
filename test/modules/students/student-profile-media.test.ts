@@ -5,8 +5,84 @@ import { StoredImage } from "../../../src/infrastructure/profile-image-storage";
 import { IUnitOfWork } from "../../../src/core/uow/uow.interface";
 import { IStudentRepository } from "../../../src/modules/students/domain/student.repository";
 import { IStudentFactory } from "../../../src/modules/students/student.factory";
+import { StudentFactory } from "../../../src/modules/students/student.factory";
+import { UserFactory } from "../../../src/modules/users/user.factory";
 
 describe("StudentService profile media", () => {
+  test("accepts a user ID for updates and returns a user-rooted profile", async () => {
+    const student = {
+      id: 9,
+      userID: 101,
+      studentCode: "S1",
+      classBookID: 3,
+      skills: "systems,design",
+      user: {
+        id: 101,
+        email: "student@example.com",
+        firstNameTh: "ชื่อ",
+        lastNameTh: "สกุล",
+        firstNameEn: null,
+        lastNameEn: null,
+        nickName: null,
+        imageUrl: null,
+        prefix: null,
+        imageMedia: null,
+      },
+    } as Student;
+    const repository = {
+      getStudentById: vi.fn(async (id: number) =>
+        id === 101 ? student : null,
+      ),
+    };
+    const tx = {
+      student: {
+        updateStudent: vi.fn(async (_id: number, data: Partial<Student>) => ({
+          ...student,
+          ...data,
+        })),
+      },
+      user: {
+        updateUser: vi.fn(async (_id: number, data: Record<string, unknown>) => ({
+          ...student.user,
+          ...data,
+        })),
+      },
+    };
+    const unitOfWork = {
+      runInTransaction: vi.fn(async (run: (transaction: unknown) => unknown) =>
+        run(tx),
+      ),
+    };
+    const service = new StudentService(
+      repository as unknown as IStudentRepository,
+      { upload: vi.fn(), delete: vi.fn() } as never,
+      new StudentFactory(new UserFactory()),
+      unitOfWork as unknown as IUnitOfWork,
+    );
+
+    const result = await service.updateStudent(
+      101,
+      { studentCode: "S2" },
+      { userID: 101, isAdmin: true },
+    );
+
+    expect(repository.getStudentById).toHaveBeenCalledWith(101);
+    expect(tx.student.updateStudent).toHaveBeenCalledWith(9, {
+      studentCode: "S2",
+      linkedin: undefined,
+      github: undefined,
+      facebook: undefined,
+      instagram: undefined,
+      classBookID: undefined,
+      skills: null,
+    });
+    expect(result).toMatchObject({
+      id: 101,
+      student: { id: 9, studentCode: "S2", skills: [] },
+    });
+    expect("user" in result).toBe(false);
+  });
+
   test("checks profile ownership before upload", async () => {
     const storage = { provider: "rustfs" as const, upload: vi.fn(), delete: vi.fn() };
     const repository = {

@@ -12,6 +12,23 @@ import { ErrorCode } from "../core/types/errors";
 import { HttpStatusCode } from "../core/types/http";
 import { PrismaInstance } from "../lib/db";
 
+const professorViewWhere = (
+  query: ProfessorQueryParams,
+): Prisma.UserProfessorViewWhereInput => {
+  if (!query.search || !query.searchBy) return {};
+  const search = { contains: query.search, mode: "insensitive" as const };
+  return query.searchBy === "firstNameTh"
+    ? { firstNameTh: search }
+    : { professor: { is: { [query.searchBy]: search } } };
+};
+
+type ProfessorViewRow = Prisma.UserProfessorViewGetPayload<{
+  include: { professor: true; prefix: true; imageMedia: true };
+}>;
+
+const toProfessor = ({ professor, prefix, imageMedia, ...user }: ProfessorViewRow) =>
+  ({ ...professor, user: { ...user, prefix, imageMedia } }) as Professor;
+
 export class ProfessorRepository implements IProfessorRepository {
   constructor(private readonly db: PrismaInstance) {}
 
@@ -31,47 +48,36 @@ export class ProfessorRepository implements IProfessorRepository {
       pageSize = 10,
       orderBy = "createdAt",
       sortBy = "asc",
-      search,
-      searchBy,
     } = query;
+    const order = { [orderBy]: sortBy as Prisma.SortOrder };
 
-    let searchCondition = {};
-    if (search && searchBy && searchBy === "firstNameTh") {
-      searchCondition = {
-        user: { firstNameTh: { contains: search, mode: "insensitive" } },
-      };
-    } else if (search && searchBy) {
-      searchCondition = {
-        [searchBy]: { contains: search, mode: "insensitive" },
-      };
-    }
-
-    const professors = await this.db.professor.findMany({
+    const rows = await this.db.userProfessorView.findMany({
       skip: calculatePagination(page, pageSize),
       take: pageSize,
-      orderBy: {
-        [orderBy]: sortBy,
-      },
-      where: {
-        deletedAt: null,
-        ...searchCondition,
-      },
+      orderBy: ["firstNameTh", "lastNameTh", "firstNameEn", "lastNameEn", "email"].includes(orderBy)
+        ? order
+        : { professor: order },
+      where: professorViewWhere(query),
       include: {
-        user: { include: { prefix: true, imageMedia: true } },
+        professor: true,
+        prefix: true,
+        imageMedia: true,
       },
     });
-    return professors as unknown as Professor[];
+    return rows.map(toProfessor);
   }
 
   async getProfessorById(id: number): Promise<Professor | null> {
     try {
-      const professor = await this.db.professor.findUnique({
-        where: { id, deletedAt: null },
+      const row = await this.db.userProfessorView.findUnique({
+        where: { id },
         include: {
-          user: { include: { prefix: true, imageMedia: true } },
+          professor: true,
+          prefix: true,
+          imageMedia: true,
         },
       });
-      return professor as Professor | null;
+      return row ? toProfessor(row) : null;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === "P2025") {
@@ -130,18 +136,15 @@ export class ProfessorRepository implements IProfessorRepository {
   // }
 
   async countProfessors(query: ProfessorQueryParams): Promise<number> {
-    const count = await this.db.professor.count({
-      where: {
-        deletedAt: null,
-      },
-    });
-    return count;
+    return this.db.userProfessorView.count({ where: professorViewWhere(query) });
   }
 
-  async deleteProfessor(professorID: number): Promise<Professor | null> {
+  async deleteProfessor(userID: number): Promise<Professor | null> {
+    const existing = await this.getProfessorById(userID);
+    if (!existing) return null;
     try {
       const professor = await this.db.professor.update({
-        where: { id: professorID },
+        where: { id: existing.id },
         data: {
           deletedAt: new Date(),
         },

@@ -6,6 +6,7 @@
 
 generator client {
   provider      = "prisma-client-js"
+  previewFeatures = ["views"]
   binaryTargets = ["native", "linux-musl-openssl-3.0.x", "windows", "darwin"]
   output        = "../src/generated/prisma"
 }
@@ -83,6 +84,8 @@ model ImageMedia {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
   users       User[]
+  userStudentViews UserStudentView[]
+  userProfessorViews UserProfessorView[]
   newsImages  NewsImage[]
   projects    Project[]
   projectImages ProjectImage[]
@@ -303,6 +306,7 @@ model Student {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
   user        User      @relation(fields: [userID], references: [id])
+  userStudentView UserStudentView?
   classBook   ClassBook @relation(fields: [classBookID], references: [id])
 
   @@map("students")
@@ -343,6 +347,7 @@ model Professor {
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
   user User @relation(fields: [userID], references: [id])
+  userProfessorView UserProfessorView?
 
   @@map("professors")
   @@schema("public")
@@ -438,8 +443,58 @@ model Prefix {
   shortNameTh String      @map("short_name_th")
   shortNameEn String      @map("short_name_en")
   users       User[]
+  userStudentViews UserStudentView[]
+  userProfessorViews UserProfessorView[]
 
   @@map("prefixes")
+  @@schema("public")
+}
+
+view UserStudentView {
+  id                  Int       @unique
+  email               String
+  prefixID            Int?      @map("prefix_id")
+  firstNameEn         String?   @map("first_name_en")
+  firstNameTh         String    @map("first_name_th")
+  imageUrl            String?   @map("image_url")
+  imageID             Int?      @map("image_id")
+  imageFocalPointX    Float?    @map("image_focal_point_x")
+  imageFocalPointY    Float?    @map("image_focal_point_y")
+  lastNameEn          String?   @map("last_name_en")
+  lastNameTh          String    @map("last_name_th")
+  nickName            String?   @map("nick_name")
+  createdAt           DateTime  @map("created_at")
+  updatedAt           DateTime  @map("updated_at")
+  studentID           Int       @unique @map("student_id")
+  student             Student    @relation(fields: [studentID], references: [id])
+  prefix              Prefix?     @relation(fields: [prefixID], references: [id])
+  imageMedia          ImageMedia? @relation(fields: [imageID], references: [id])
+
+  @@map("user_student_view")
+  @@schema("public")
+}
+
+view UserProfessorView {
+  id                  Int       @unique
+  email               String
+  prefixID            Int?      @map("prefix_id")
+  firstNameEn         String?   @map("first_name_en")
+  firstNameTh         String    @map("first_name_th")
+  imageUrl            String?   @map("image_url")
+  imageID             Int?      @map("image_id")
+  imageFocalPointX    Float?    @map("image_focal_point_x")
+  imageFocalPointY    Float?    @map("image_focal_point_y")
+  lastNameEn          String?   @map("last_name_en")
+  lastNameTh          String    @map("last_name_th")
+  nickName            String?   @map("nick_name")
+  createdAt           DateTime  @map("created_at")
+  updatedAt           DateTime  @map("updated_at")
+  professorID         Int       @unique @map("professor_id")
+  professor           Professor  @relation(fields: [professorID], references: [id])
+  prefix              Prefix?     @relation(fields: [prefixID], references: [id])
+  imageMedia          ImageMedia? @relation(fields: [imageID], references: [id])
+
+  @@map("user_professor_view")
   @@schema("public")
 }
 

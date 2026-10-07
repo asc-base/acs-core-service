@@ -34,8 +34,8 @@ export const StudentDocs = {
   },
   getStudentById: {
     detail: {
-      summary: "Get student by ID",
-      description: "Retrieve a student's information by their ID",
+      summary: "Get student by user ID",
+      description: "Retrieve a user and their student profile by user ID",
       tags: ["Students"],
     },
     params: t.Object({
@@ -62,8 +62,8 @@ export const StudentDocs = {
   },
   deleteStudent: {
     detail: {
-      summary: "Delete student",
-      description: "Delete a student's information by their ID",
+      summary: "Delete student profile by user ID",
+      description: "Soft-delete a user's student profile by user ID",
       tags: ["Students"],
     },
     params: t.Object({
@@ -75,8 +75,8 @@ export const StudentDocs = {
   },
   updateStudent: {
     detail: {
-      summary: "Update student",
-      description: "Update a student's information by their ID",
+      summary: "Update student profile by user ID",
+      description: "Update a user's student profile by user ID",
       tags: ["Students"],
     },
     transform({ body }: { body: StudentUpdateDTO }) {

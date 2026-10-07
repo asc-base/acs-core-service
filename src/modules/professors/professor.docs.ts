@@ -47,9 +47,8 @@ export const ProfessorDocs = {
   },
   getProfessorById: {
     detail: {
-      summary: "Retrieves a professor by ID.",
-      description:
-        "This endpoint fetches the details of a specific professor using their unique ID.",
+      summary: "Retrieves a professor by user ID.",
+      description: "Retrieves a user and their professor profile by user ID.",
       tags: ["Professors"],
     },
     params: t.Object({
@@ -62,9 +61,8 @@ export const ProfessorDocs = {
   },
   updateProfessor: {
     detail: {
-      summary: "Updates an existing professor's details.",
-      description:
-        "This endpoint allows for updating the details of an existing professor by their ID.",
+      summary: "Updates a professor profile by user ID.",
+      description: "Updates a user's professor profile by user ID.",
       tags: ["Professors"],
     },
     transform({ body }: { body: ProfessorUpdateDTO }) {
@@ -96,8 +94,8 @@ export const ProfessorDocs = {
   },
   deleteProfessor: {
     detail: {
-      summary: "Delete professor by ID.",
-      description: "Delete a specific professor by ID.",
+      summary: "Delete a professor profile by user ID.",
+      description: "Soft-delete a user's professor profile by user ID.",
       tags: ["Professors"],
     },
     params: t.Object({

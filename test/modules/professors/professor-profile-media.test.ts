@@ -6,6 +6,8 @@ import { IUserRepository } from "../../../src/modules/users/domain/user.reposito
 import { IProfessorFactory } from "../../../src/modules/professors/profressor.factory";
 import { Professor } from "../../../src/modules/professors/domain/professor";
 import { ProfileImageStorage } from "../../../src/infrastructure/profile-image-storage";
+import { ProfessorFactory } from "../../../src/modules/professors/profressor.factory";
+import { UserFactory } from "../../../src/modules/users/user.factory";
 
 const pngFile = () =>
   new File(
@@ -20,6 +22,72 @@ const pngFile = () =>
   );
 
 describe("ProfessorService profile media", () => {
+  test("accepts a user ID for edits and returns the user-rooted profile", async () => {
+    const existing: Professor = {
+      id: 9,
+      userID: 101,
+      profRoom: "1/1",
+      phone: "0123456789",
+      expertFields: null,
+      educations: null,
+      researchProfile: null,
+      user: {
+        id: 101,
+        email: "professor@example.com",
+        firstNameTh: "ชื่อ",
+        lastNameTh: "สกุล",
+        firstNameEn: null,
+        lastNameEn: null,
+        prefix: null,
+        imageUrl: null,
+      },
+    } as Professor;
+    const repository = {
+      getProfessorById: vi.fn(async (id: number) => id === 101 ? existing : null),
+    };
+    const tx = {
+      user: {
+        updateUser: vi.fn(async (_id: number, data: Record<string, unknown>) => ({
+          ...existing.user,
+          ...data,
+        })),
+      },
+      professor: {
+        updateProfessor: vi.fn(async (_id: number, data: Record<string, unknown>) => ({
+          ...existing,
+          ...data,
+        })),
+      },
+    };
+    const unitOfWork = {
+      runInTransaction: vi.fn(async (run: (transaction: unknown) => unknown) =>
+        run(tx),
+      ),
+    };
+    const service = new ProfessorService(
+      repository as unknown as IProfessorRepository,
+      {} as IUserRepository,
+      new ProfessorFactory(new UserFactory()),
+      { upload: vi.fn(), delete: vi.fn() } as never,
+      unitOfWork as unknown as IUnitOfWork,
+    );
+
+    const result = await service.updateProfessor(101, { profRoom: "2/2" } as never);
+
+    expect(repository.getProfessorById).toHaveBeenCalledWith(101);
+    expect(tx.professor.updateProfessor).toHaveBeenCalledWith(9, {
+      phone: undefined,
+      profRoom: "2/2",
+      educations: undefined,
+      expertFields: undefined,
+    });
+    expect(result).toMatchObject({
+      id: 101,
+      professor: { id: 9, profRoom: "2/2" },
+    });
+    expect("user" in result!).toBe(false);
+  });
+
   test("restores an existing professor and updates the shared user's image atomically", async () => {
     const existingUser = { id: 5, userRoles: [{ roleID: 3 }] };
     const existingProfessor = { id: 7, userID: 5, deletedAt: new Date() };
@@ -58,7 +126,10 @@ describe("ProfessorService profile media", () => {
       delete: vi.fn(async () => {}),
     };
     const professorFactory = {
-      mapProfessorToDTO: vi.fn((professor: Professor) => professor),
+      mapProfessorToDTO: vi.fn((professor: Professor) => ({
+        id: professor.user.id,
+        professor: { id: professor.id },
+      })),
       mapPrfessorListToDTO: vi.fn(),
     };
     const service = new ProfessorService(
@@ -107,6 +178,9 @@ describe("ProfessorService profile media", () => {
       expect.objectContaining({ deletedAt: null }),
     );
     expect(storage.delete).not.toHaveBeenCalled();
-    expect(result).toMatchObject({ id: existingProfessor.id, userID: existingUser.id });
+    expect(result).toMatchObject({
+      id: existingUser.id,
+      professor: { id: existingProfessor.id },
+    });
   });
 });

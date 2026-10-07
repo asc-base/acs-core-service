@@ -5,7 +5,6 @@ import {
   UserSchema,
   FocalPointInputFields,
 } from "../../users/domain/user";
-import { PrefixSchema } from "../../../core/models/prefix";
 
 export const CommonProfessorFields = {
   phone: t.String(),
@@ -53,15 +52,18 @@ export const CreateProfessorDTO = t.Object({
   research_profile: t.Optional(t.Nullable(t.String())),
 });
 
-export const ProfessorDTO = t.Object({
+export const ProfessorProfileDTO = t.Object({
   id: t.Number(),
   ...CommonProfessorFields,
   expertFields: t.Array(t.String()),
   educations: t.Array(t.String()),
   research_profile: t.Nullable(t.String()),
-  prefix: t.Optional(t.Nullable(PrefixSchema)),
-  user: UserSchema,
 });
+
+export const ProfessorDTO = t.Intersect([
+  UserSchema,
+  t.Object({ professor: ProfessorProfileDTO }),
+]);
 
 export const ProfessorQueryParams = t.Object({
   ...CommonQueryParams,
