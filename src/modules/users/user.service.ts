@@ -2,7 +2,7 @@ import { hashPassword } from "better-auth/crypto";
 import { CreateSuperUserDTO, UserDTO, UserProfileDTO } from "./domain/user";
 import { IUserRepository } from "./domain/user.repository";
 import { IUserFactory } from "./user.factory";
-import { IAuthRepository } from "../auth/domain/auth.repository";
+import { IUnitOfWork } from "../../core/uow/uow.interface";
 
 export interface IUserService {
   createSuperUser(data: CreateSuperUserDTO): Promise<UserDTO>;
@@ -15,28 +15,27 @@ export class UserService implements IUserService {
   constructor(
     private readonly userRepository: IUserRepository,
     private readonly userFactory: IUserFactory,
-    private readonly authRepository: IAuthRepository,
+    private readonly unitOfWork: IUnitOfWork,
   ) {}
 
   async createSuperUser(data: CreateSuperUserDTO): Promise<UserDTO> {
     const { password, ...userData } = data;
     const hashedPassword = await hashPassword(password);
-    const user = await this.userRepository.createUser({
-      ...userData,
+    return this.unitOfWork.runInTransaction(async (tx) => {
+      const user = await tx.user.createUser(userData);
+      const userRole = await tx.user.assignUserRole({
+        userID: user.id,
+        roleID: 1,
+      });
+
+      if (!userRole) {
+        throw new Error("Failed to assign superuser role");
+      }
+
+      await tx.auth.syncCredentialAccount(user.id, hashedPassword);
+
+      return this.userFactory.mapUserToDTO(user);
     });
-
-    const userRoles = await this.userRepository.assignUserRole({
-      userID: user.id,
-      roleID: 1,
-    });
-
-    if (!userRoles) {
-      throw new Error("Failed to assign superuser role");
-    }
-
-    await this.authRepository.syncCredentialAccount(user.id, hashedPassword);
-
-    return this.userFactory.mapUserToDTO(user);
   }
 
   async getUsers(): Promise<UserDTO[]> {

@@ -1,14 +1,14 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { verifyPassword } from "better-auth/crypto";
 import {
   CreateUserModel,
-  CreateUserRoleModel,
   CreateSuperUserDTO,
   User,
   UserRole,
 } from "../../src/modules/users/domain/user";
 import { IUserRepository } from "../../src/modules/users/domain/user.repository";
 import { IAuthRepository } from "../../src/modules/auth/domain/auth.repository";
+import { IUnitOfWork } from "../../src/core/uow/uow.interface";
 import { UserFactory } from "../../src/modules/users/user.factory";
 import { UserService } from "../../src/modules/users/user.service";
 
@@ -17,7 +17,7 @@ describe("UserService.createSuperUser", () => {
     const password = "P@ssw0rd";
     const user = createUser();
     let createdUser: CreateUserModel | undefined;
-    let assignedRole: CreateUserRoleModel | undefined;
+    let assignedRole: { userID: number; roleID: number } | undefined;
     let credential: { userID: number; passwordHash: string } | undefined;
 
     const userRepository: IUserRepository = {
@@ -39,11 +39,8 @@ describe("UserService.createSuperUser", () => {
         credential = { userID, passwordHash };
       },
     };
-    const service = new UserService(
-      userRepository,
-      new UserFactory(),
-      authRepository,
-    );
+    const unitOfWork = createUnitOfWork(userRepository, authRepository);
+    const service = new UserService(userRepository, new UserFactory(), unitOfWork);
 
     const result = await service.createSuperUser(createSuperUserData(password));
 
@@ -56,6 +53,7 @@ describe("UserService.createSuperUser", () => {
       nickName: "admin",
     });
     expect(createdUser).not.toHaveProperty("password");
+    expect(unitOfWork.runInTransaction).toHaveBeenCalledOnce();
     expect(assignedRole).toEqual({
       userID: user.id,
       roleID: 1,
@@ -81,6 +79,40 @@ describe("UserService.createSuperUser", () => {
       imageFocalPointY: null,
     });
   });
+
+  test.each(["role assignment", "credential write"])(
+    "propagates a %s failure from the transaction",
+    async (failurePoint) => {
+      const failure = new Error(`${failurePoint} failed`);
+      const user = createUser();
+      const userRepository: IUserRepository = {
+        createUser: vi.fn(async () => user),
+        getUsers: async () => [],
+        assignUserRole: vi.fn(async () => {
+          if (failurePoint === "role assignment") throw failure;
+          return {} as UserRole;
+        }),
+        updateUser: async () => user,
+        getUserByEmail: async () => null,
+        getUserById: async () => null,
+      };
+      const authRepository: IAuthRepository = {
+        syncCredentialAccount: vi.fn(async () => {
+          if (failurePoint === "credential write") throw failure;
+        }),
+      };
+      const unitOfWork = createUnitOfWork(userRepository, authRepository);
+      const service = new UserService(userRepository, new UserFactory(), unitOfWork);
+
+      await expect(
+        service.createSuperUser(createSuperUserData("P@ssw0rd")),
+      ).rejects.toBe(failure);
+      expect(unitOfWork.runInTransaction).toHaveBeenCalledOnce();
+      expect(authRepository.syncCredentialAccount).toHaveBeenCalledTimes(
+        failurePoint === "credential write" ? 1 : 0,
+      );
+    },
+  );
 });
 
 describe("UserService.getUserProfile", () => {
@@ -113,13 +145,10 @@ describe("UserService.getUserProfile", () => {
       getUserByEmail: async () => null,
       getUserById: async () => user,
     };
-    const authRepository: IAuthRepository = {
-      syncCredentialAccount: async () => undefined,
-    };
     const service = new UserService(
       userRepository,
       new UserFactory(),
-      authRepository,
+      createUnitOfWork(userRepository, { syncCredentialAccount: async () => undefined }),
     );
 
     await expect(service.getUserProfile(user.id)).resolves.toEqual({
@@ -138,6 +167,16 @@ describe("UserService.getUserProfile", () => {
     });
   });
 });
+
+const createUnitOfWork = (
+  user: IUserRepository,
+  auth: IAuthRepository,
+): IUnitOfWork =>
+  ({
+    runInTransaction: vi.fn((fn: (uow: IUnitOfWork) => Promise<unknown>) =>
+      fn({ user, auth } as IUnitOfWork),
+    ),
+  }) as unknown as IUnitOfWork;
 
 const createSuperUserData = (password: string): CreateSuperUserDTO => ({
   firstNameTh: "ผู้ดูแล",
