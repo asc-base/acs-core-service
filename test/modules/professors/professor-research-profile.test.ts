@@ -68,7 +68,7 @@ describe("professor research profile", () => {
       profRoom: "1/1",
       phone: "0123456789",
       expertFields: null,
-      educations: null,
+      educations: [],
       researchProfile: "https://example.edu/research",
       user: { prefix: null },
     } as never);

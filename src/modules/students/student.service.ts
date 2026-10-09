@@ -217,7 +217,12 @@ export class StudentService implements IStudentService {
         facebook,
         instagram,
         classBookID,
-        skills: skills ? skills.join(",") : null,
+        skills:
+          skills === undefined
+            ? undefined
+            : Array.isArray(skills)
+              ? skills.join(",")
+              : null,
       };
 
       const student = await this.unitOfWork.runInTransaction(async (tx) => {
@@ -234,8 +239,10 @@ export class StudentService implements IStudentService {
           ...(image && {
             imageID: image.id,
             imageUrl: storedImage!.imageUrl,
-            imageFocalPointX: imageFocalPointX ?? null,
-            imageFocalPointY: imageFocalPointY ?? null,
+            imageFocalPointX:
+              imageFocalPointX ?? existing.user.imageFocalPointX ?? null,
+            imageFocalPointY:
+              imageFocalPointY ?? existing.user.imageFocalPointY ?? null,
           }),
           ...(!image && { imageFocalPointX, imageFocalPointY }),
         };

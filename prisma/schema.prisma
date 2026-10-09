@@ -340,13 +340,13 @@ model Professor {
   profRoom           String    @map("prof_room")
   phone              String    @map("phone")
   expertFields       String?   @map("expert_fields")
-  educations         String?   @map("educations")
   researchProfile    String?   @map("research_profile")
   createdAt          DateTime  @default(now()) @map("created_at")
   deletedAt          DateTime? @map("deleted_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
   user User @relation(fields: [userID], references: [id])
+  educations Education[]
   userProfessorView UserProfessorView?
 
   @@map("professors")
@@ -423,17 +423,19 @@ model ClassBook {
   @@schema("public")
 }
 
-// model Education {
-//   id          Int        @id @default(autoincrement()) @map("id")
-//   education   String     @map("education")
-//   professor   Professor? @relation(fields: [professorID], references: [id])
-//   professorID Int        @map("professor_id")
-//   createdAt   DateTime   @default(now()) @map("created_at")
-//   updatedAt   DateTime   @updatedAt @map("updated_at")
-//   deletedAt   DateTime?  @map("deleted_at")
+model Education {
+  id          Int       @id @default(autoincrement()) @map("id")
+  education   String    @map("education")
+  sequence    Int       @default(0) @map("sequence")
+  professorID Int       @map("professor_id")
+  professor   Professor @relation(fields: [professorID], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
-//   @@map("education")
-// }
+  @@unique([professorID, sequence])
+  @@map("education")
+  @@schema("public")
+}
 
 model Prefix {
   id          Int         @id @default(autoincrement()) @map("id")

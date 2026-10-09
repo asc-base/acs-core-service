@@ -82,7 +82,14 @@ export const StudentDocs = {
     transform({ body }: { body: StudentUpdateDTO }) {
       Object.keys(body).forEach((key) => {
         const k = key as keyof StudentUpdateDTO;
-        if (body[k] === "") {
+        if (k === "skills" && body.skills === "") {
+          body.skills = [];
+        } else if (
+          body[k] === "" &&
+          ["firstNameEn", "lastNameEn", "nickName", "linkedin", "github", "facebook", "instagram"].includes(key)
+        ) {
+          (body as Record<string, unknown>)[key] = null;
+        } else if (body[k] === "") {
           body[k] = undefined;
         }
       });

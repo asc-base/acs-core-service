@@ -20,9 +20,6 @@ export const ProfessorDocs = {
       if (body.expertFields != null && body.expertFields !== "") {
         body.expertFields = body.expertFields.replaceAll(",", "/");
       }
-      if (body.educations != null && body.educations !== "") {
-        body.educations = body.educations.replaceAll(",", "/");
-      }
       if (body.research_profile != null) {
         body.research_profile = body.research_profile.trim() || null;
       }
@@ -69,16 +66,19 @@ export const ProfessorDocs = {
       if (body.expertFields != null && body.expertFields !== "") {
         body.expertFields = body.expertFields.replaceAll(",", "/");
       }
-      if (body.educations != null && body.educations !== "") {
-        body.educations = body.educations.replaceAll(",", "/");
-      }
       if (body.research_profile != null) {
         body.research_profile = body.research_profile.trim();
       }
 
       Object.keys(body).forEach((key) => {
         const k = key as keyof ProfessorUpdateDTO;
-        if (body[k] === "" && k !== "research_profile") {
+        if (body[k] === "" && k === "educations") return;
+        if (
+          body[k] === "" &&
+          ["firstNameEn", "lastNameEn", "nickName", "expertFields"].includes(k)
+        ) {
+          (body as Record<string, unknown>)[k] = null;
+        } else if (body[k] === "" && k !== "research_profile") {
           body[k] = undefined;
         }
       });

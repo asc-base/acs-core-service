@@ -29,7 +29,7 @@ describe("ProfessorService profile media", () => {
       profRoom: "1/1",
       phone: "0123456789",
       expertFields: null,
-      educations: null,
+      educations: [],
       researchProfile: null,
       user: {
         id: 101,
@@ -76,10 +76,7 @@ describe("ProfessorService profile media", () => {
 
     expect(repository.getProfessorById).toHaveBeenCalledWith(101);
     expect(tx.professor.updateProfessor).toHaveBeenCalledWith(9, {
-      phone: undefined,
       profRoom: "2/2",
-      educations: undefined,
-      expertFields: undefined,
     });
     expect(result).toMatchObject({
       id: 101,

@@ -80,6 +80,7 @@ export class ProfessorService implements IProfessorService {
       imageFocalPointY,
       prefixID,
       research_profile,
+      educations,
       ...rawProfessorData
     } = data;
     const researchProfile = normalizeResearchProfileURL(research_profile);
@@ -152,12 +153,16 @@ export class ProfessorService implements IProfessorService {
         if (existingProfessor) {
           professor = await tx.professor.updateProfessor(existingProfessor.id, {
             ...rawProfessorData,
+            ...(educations !== undefined && {
+              educations: splitEducations(educations),
+            }),
             researchProfile,
             deletedAt: null,
           });
         } else {
           const professorData: ProfessorCreatePayload = {
             ...rawProfessorData,
+            educations: splitEducations(educations),
             researchProfile: researchProfile ?? null,
             userID: user.id,
           };
@@ -245,10 +250,12 @@ export class ProfessorService implements IProfessorService {
       }
 
       const updatedProfessor: ProfessorUpdatePayload = {
-        phone,
-        profRoom,
-        educations,
-        expertFields,
+        ...(phone !== undefined && { phone }),
+        ...(profRoom !== undefined && { profRoom }),
+        ...(educations !== undefined && {
+          educations: splitEducations(educations),
+        }),
+        ...(expertFields !== undefined && { expertFields }),
         ...(research_profile !== undefined && {
           researchProfile: normalizeResearchProfileURL(research_profile),
         }),
@@ -263,20 +270,25 @@ export class ProfessorService implements IProfessorService {
               fileSize: imageFile!.size,
             })
           : null;
-        const user = await tx.user.updateUser(existing.userID, {
+        const updatedUserData: UpdateUserModel = {
           ...UserData,
           ...(image && {
             imageID: image.id,
             imageUrl: storedImage!.imageUrl,
-            imageFocalPointX: UserData.imageFocalPointX ?? null,
-            imageFocalPointY: UserData.imageFocalPointY ?? null,
+            imageFocalPointX:
+              UserData.imageFocalPointX ?? existing.user.imageFocalPointX ?? null,
+            imageFocalPointY:
+              UserData.imageFocalPointY ?? existing.user.imageFocalPointY ?? null,
           }),
-        });
+          ...(!image && { imageFocalPointX: UserData.imageFocalPointX, imageFocalPointY: UserData.imageFocalPointY }),
+        };
         const updated = await tx.professor.updateProfessor(
           existing.id,
           updatedProfessor,
         );
-        updated.user = user;
+        if (Object.values(updatedUserData).some((value) => value !== undefined)) {
+          updated.user = await tx.user.updateUser(existing.userID, updatedUserData);
+        }
         return this.professorFactory.mapProfessorToDTO(updated);
       });
       return professor;
@@ -302,4 +314,8 @@ export class ProfessorService implements IProfessorService {
     }
     return this.professorFactory.mapProfessorToDTO(professor);
   }
+}
+
+function splitEducations(educations: string | null | undefined): string[] {
+  return educations?.split("/").map((education) => education.trim()).filter(Boolean) ?? [];
 }

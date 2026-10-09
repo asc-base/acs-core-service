@@ -12,6 +12,7 @@ import { UserService } from "../../src/modules/users/user.service";
 import { StudentRepository } from "../../src/infrastructure/student.repository";
 import { StudentFactory } from "../../src/modules/students/student.factory";
 import { StudentService } from "../../src/modules/students/student.service";
+import { ProfessorRepository } from "../../src/infrastructure/profressor.repository";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const postgresDescribe = databaseUrl ? describe : describe.skip;
@@ -113,9 +114,47 @@ postgresDescribe("Prisma unit of work with PostgreSQL", () => {
     },
   );
 
+  test("stores ordered professor education rows and replaces them on update", async () => {
+    const email = `education-${randomUUID()}@example.test`;
+    const unitOfWork = new PrismaUnitOfWorkRepository(prisma);
+    const repository = new ProfessorRepository(prisma as unknown as PrismaInstance);
+
+    try {
+      const professor = await unitOfWork.runInTransaction(async (tx) => {
+        const user = await tx.user.createUser({
+          email,
+          firstNameTh: "ชื่อ",
+          lastNameTh: "สกุล",
+        });
+        return tx.professor.createProfessor({
+          userID: user.id,
+          phone: "0123456789",
+          profRoom: "1/1",
+          educations: ["ปริญญาเอก", "ปริญญาโท"],
+        });
+      });
+
+      expect((await repository.getProfessorByUserId(professor.userID))?.educations.map((row) => row.education)).toEqual([
+        "ปริญญาเอก",
+        "ปริญญาโท",
+      ]);
+
+      await unitOfWork.runInTransaction((tx) =>
+        tx.professor.updateProfessor(professor.id, { educations: ["ปริญญาตรี"] }),
+      );
+
+      expect((await repository.getProfessorByUserId(professor.userID))?.educations.map((row) => row.education)).toEqual([
+        "ปริญญาตรี",
+      ]);
+    } finally {
+      await cleanupUser(prisma, email);
+    }
+  });
+
   test("rolls back user, professor, student, image, and auth rows together", async () => {
     const email = `uow-${randomUUID()}@example.test`;
     let userID: number | undefined;
+    let professorID: number | undefined;
     let imageID: number | undefined;
     let curriculumID: number | undefined;
     let classBookID: number | undefined;
@@ -160,11 +199,13 @@ postgresDescribe("Prisma unit of work with PostgreSQL", () => {
           await tx.user.assignUserRole({ userID, roleID: 1 });
           await tx.user.assignUserRole({ userID, roleID: 2 });
           await tx.user.assignUserRole({ userID, roleID: 3 });
-          await tx.professor.createProfessor({
+          const professor = await tx.professor.createProfessor({
             userID,
             phone: "0123456789",
             profRoom: "1/1",
+            educations: ["ปริญญาเอก"],
           });
+          professorID = professor.id;
           await tx.student.createStudent({
             userID,
             classBookID: classBook.id,
@@ -179,6 +220,7 @@ postgresDescribe("Prisma unit of work with PostgreSQL", () => {
       expect(await prisma.authUser.findUnique({ where: { email } })).toBeNull();
       expect(await prisma.userRole.count({ where: { userID } })).toBe(0);
       expect(await prisma.professor.count({ where: { userID } })).toBe(0);
+      expect(await prisma.education.count({ where: { professorID } })).toBe(0);
       expect(await prisma.student.count({ where: { userID } })).toBe(0);
       expect(await prisma.imageMedia.findUnique({ where: { id: imageID } })).toBeNull();
       expect(

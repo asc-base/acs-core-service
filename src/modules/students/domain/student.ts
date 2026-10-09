@@ -61,7 +61,7 @@ export const StudentUpdateDTO = t.Partial(
     ...FocalPointInputFields,
     classBookID: t.Numeric(),
     imageFile: t.Optional(t.Nullable(t.File())),
-    skills: t.Optional(t.Array(t.String())),
+    skills: t.Optional(t.Union([t.Array(t.String()), t.Literal("")])),
   }),
 );
 

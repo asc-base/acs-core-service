@@ -22,8 +22,10 @@ const professorViewWhere = (
     : { professor: { is: { [query.searchBy]: search } } };
 };
 
+const educationInclude = { orderBy: { sequence: "asc" as const } };
+
 type ProfessorViewRow = Prisma.UserProfessorViewGetPayload<{
-  include: { professor: true; prefix: true; imageMedia: true };
+  include: { professor: { include: { educations: true } }; prefix: true; imageMedia: true };
 }>;
 
 const toProfessor = ({ professor, prefix, imageMedia, ...user }: ProfessorViewRow) =>
@@ -33,10 +35,17 @@ export class ProfessorRepository implements IProfessorRepository {
   constructor(private readonly db: PrismaInstance) {}
 
   async createProfessor(data: ProfessorCreatePayload,): Promise<Professor> {
+    const { educations = [], ...professorData } = data;
     const professor = await this.db.professor.create({
-      data,
+      data: {
+        ...professorData,
+        educations: {
+          create: educations.map((education, sequence) => ({ education, sequence })),
+        },
+      },
       include: {
         user: { include: { prefix: true, imageMedia: true } },
+        educations: educationInclude,
       },
     });
     return professor as unknown as Professor;
@@ -59,7 +68,7 @@ export class ProfessorRepository implements IProfessorRepository {
         : { professor: order },
       where: professorViewWhere(query),
       include: {
-        professor: true,
+        professor: { include: { educations: educationInclude } },
         prefix: true,
         imageMedia: true,
       },
@@ -72,7 +81,7 @@ export class ProfessorRepository implements IProfessorRepository {
       const row = await this.db.userProfessorView.findUnique({
         where: { id },
         include: {
-          professor: true,
+          professor: { include: { educations: educationInclude } },
           prefix: true,
           imageMedia: true,
         },
@@ -98,6 +107,7 @@ export class ProfessorRepository implements IProfessorRepository {
         where: { userID },
         include: {
           user: { include: { prefix: true, imageMedia: true } },
+          educations: educationInclude,
         },
       });
       return professor as unknown as Professor | null;
@@ -116,24 +126,25 @@ export class ProfessorRepository implements IProfessorRepository {
   }
 
   async updateProfessor(professorID: number, data: ProfessorUpdatePayload ): Promise<Professor> {
+    const { educations, ...professorData } = data;
     const professor = await this.db.professor.update({
       where: { id: professorID },
-      data,
+      data: {
+        ...professorData,
+        ...(educations !== undefined && {
+          educations: {
+            deleteMany: {},
+            create: educations.map((education, sequence) => ({ education, sequence })),
+          },
+        }),
+      },
       include: {
         user: { include: { prefix: true, imageMedia: true } },
+        educations: educationInclude,
       },
     });
     return professor as unknown as Professor;
   }
-
-  // async assignEducation(
-  //   data: Prisma.EducationUncheckedCreateInput,
-  // ): Promise<Education> {
-  //   const education = await this.prisma.education.create({
-  //     data,
-  //   });
-  //   return education;
-  // }
 
   async countProfessors(query: ProfessorQueryParams): Promise<number> {
     return this.db.userProfessorView.count({ where: professorViewWhere(query) });
@@ -150,6 +161,7 @@ export class ProfessorRepository implements IProfessorRepository {
         },
         include: {
           user: { include: { prefix: true, imageMedia: true } },
+          educations: educationInclude,
         },
       });
       return professor as unknown as Professor;

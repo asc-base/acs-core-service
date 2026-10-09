@@ -5,6 +5,7 @@ import {
   UserSchema,
   FocalPointInputFields,
 } from "../../users/domain/user";
+import { EducationSchema } from "./education";
 
 export const CommonProfessorFields = {
   phone: t.String(),
@@ -16,7 +17,7 @@ export const ProfessorSchema = t.Intersect([
     id: t.Number(),
     userID: t.Number(),
     expertFields: t.Optional(t.Nullable(t.String())),
-    educations: t.Optional(t.Nullable(t.String())),
+    educations: t.Array(EducationSchema),
     researchProfile: t.Optional(t.Nullable(t.String())),
     ...CommonProfessorFields,
     user: UserSchema,
@@ -101,7 +102,7 @@ export const ProfessorCreatePayloadSchema = t.Object({
   phone: t.String(),
   profRoom: t.String(),
   expertFields: t.Optional(t.Nullable(t.String())),
-  educations: t.Optional(t.Nullable(t.String())),
+  educations: t.Optional(t.Array(t.String())),
   researchProfile: t.Optional(t.Nullable(t.String())),
   userID: t.Number(),
 });
@@ -111,7 +112,7 @@ export const ProfessorUpdatePayloadSchema = t.Partial(
     phone: t.String(),
     profRoom: t.String(),
     expertFields: t.Optional(t.Nullable(t.String())),
-    educations: t.Optional(t.Nullable(t.String())),
+    educations: t.Optional(t.Array(t.String())),
     researchProfile: t.Optional(t.Nullable(t.String())),
     deletedAt: t.Optional(t.Nullable(t.Date())),
   }),
