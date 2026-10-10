@@ -27,7 +27,7 @@ describe("AuthService", () => {
           throw new Error("Not used by this test");
         },
       },
-      "https://app.example.com/reset-password",
+      "https://app.example.com/auth/reset-password",
       createUserRepository({} as User),
     );
 
@@ -35,7 +35,7 @@ describe("AuthService", () => {
 
     expect(passwordResetRequest).toEqual({
       email: input.email,
-      redirectTo: "https://app.example.com/reset-password",
+      redirectTo: "https://app.example.com/auth/reset-password",
       headers: request,
     });
   });
@@ -59,7 +59,7 @@ describe("AuthService", () => {
           resetPasswordRequest = data;
         },
       },
-      "https://app.example.com/reset-password",
+      "https://app.example.com/auth/reset-password",
       createUserRepository({} as User),
     );
 
@@ -83,7 +83,7 @@ describe("AuthService", () => {
           throw new Error("Not used by this test");
         },
       },
-      "https://app.example.com/reset-password",
+      "https://app.example.com/auth/reset-password",
       createUserRepository(null),
     );
 

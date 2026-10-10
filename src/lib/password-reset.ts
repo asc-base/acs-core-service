@@ -6,7 +6,7 @@ import {
 
 const configuredRedirectURL =
   process.env.FRONTEND_RESET_PASSWORD_URL ??
-  "http://localhost:3000/reset-password";
+  "http://localhost:3000/auth/reset-password";
 
 if (config.ENVIRONMENT === "production" && !isPasswordResetEmailConfigured()) {
   throw new Error(

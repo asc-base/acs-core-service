@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { createBetterAuthPasswordResetSender } from "../../src/lib/password-reset";
 import {
   PasswordResetEmailMessage,
@@ -6,10 +6,40 @@ import {
   sendPasswordResetEmail,
 } from "../../src/lib/password-reset-email";
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.resetModules();
+});
+
 describe("password reset email", () => {
+  test("defaults the reset callback to the auth page", async () => {
+    vi.stubEnv("FRONTEND_RESET_PASSWORD_URL", undefined);
+    vi.resetModules();
+
+    const { passwordResetRedirectURL } = await import("../../src/lib/password-reset");
+
+    expect(passwordResetRedirectURL).toBe(
+      "http://localhost:3000/auth/reset-password",
+    );
+  });
+
+  test("uses the configured reset callback URL", async () => {
+    vi.stubEnv(
+      "FRONTEND_RESET_PASSWORD_URL",
+      "https://portal.example.com/auth/reset-password",
+    );
+    vi.resetModules();
+
+    const { passwordResetRedirectURL } = await import("../../src/lib/password-reset");
+
+    expect(passwordResetRedirectURL).toBe(
+      "https://portal.example.com/auth/reset-password",
+    );
+  });
+
   test("renders the supplied template with escaped public URLs", async () => {
     const resetURL =
-      "https://api.example.com/reset-password/token?callbackURL=https://app.example.com/reset-password";
+      "https://api.example.com/reset-password/token?callbackURL=https://app.example.com/auth/reset-password";
     const html = await renderPasswordResetEmail({
       resetURL,
       logoURL: "https://cdn.example.com/acs-logo.png",
@@ -17,7 +47,7 @@ describe("password reset email", () => {
     });
 
     expect(html).toContain(
-      "https://api.example.com/reset-password/token?callbackURL=https://app.example.com/reset-password",
+      "https://api.example.com/reset-password/token?callbackURL=https://app.example.com/auth/reset-password",
     );
     expect(html).toContain("https://cdn.example.com/acs-logo.png");
     expect(html).toContain("https://cdn.example.com/forgot-password.png");
