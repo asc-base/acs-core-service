@@ -1,5 +1,6 @@
 import { t, Static } from "elysia";
 import { BaseModelSchema, CommonQueryParams } from "../../../core/models";
+import { PrefixSchema } from "../../../core/models/prefix";
 import { UserSchema, CommonUserFields, UserDTO, FocalPointInputFields } from "../../users/domain/user";
 
 export const CommonStudentFields = {
