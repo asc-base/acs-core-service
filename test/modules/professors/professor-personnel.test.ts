@@ -74,6 +74,24 @@ describe("professor personnel", () => {
     },
   );
 
+  test.each([
+    ["asc", "asc"],
+    ["desc", "desc"],
+  ])("sorts curriculum heads before names (%s)", async (sortBy, direction) => {
+    const findMany = vi.fn(async () => []);
+    const repository = new ProfessorRepository({
+      userProfessorView: { findMany },
+    } as never);
+    await repository.getProfessors({ orderBy: "displayNameTh", sortBy });
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      orderBy: [
+        { isCurriculumHead: "desc" },
+        { displayNameTh: direction },
+        { id: "asc" },
+      ],
+    }));
+  });
+
   test("combines personnel group and search filters", async () => {
     const findMany = vi.fn(async () => []);
     const repository = new ProfessorRepository({

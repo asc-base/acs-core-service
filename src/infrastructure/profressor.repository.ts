@@ -72,13 +72,23 @@ export class ProfessorRepository implements IProfessorRepository {
       sortBy = "asc",
     } = query;
     const order = { [orderBy]: sortBy as Prisma.SortOrder };
+    const professorOrder =
+      orderBy === "displayNameTh"
+        ? [
+            { isCurriculumHead: "desc" as const },
+            { displayNameTh: sortBy as Prisma.SortOrder },
+            { id: "asc" as const },
+          ]
+        : [
+            ["firstNameTh", "lastNameTh", "firstNameEn", "lastNameEn", "email"].includes(orderBy)
+              ? order
+              : { professor: order },
+          ];
 
     const rows = await this.db.userProfessorView.findMany({
       skip: calculatePagination(page, pageSize),
       take: pageSize,
-      orderBy: ["firstNameTh", "lastNameTh", "firstNameEn", "lastNameEn", "email"].includes(orderBy)
-        ? order
-        : { professor: order },
+      orderBy: professorOrder,
       where: professorViewWhere(query),
       include: {
         professor: { include: { educations: educationInclude } },
