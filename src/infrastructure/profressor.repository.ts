@@ -148,29 +148,6 @@ export class ProfessorRepository implements IProfessorRepository {
     }
   }
 
-  async getProfessorByUserId(userID: number): Promise<Professor | null> {
-    try {
-      const professor = await this.db.professor.findUnique({
-        where: { userID },
-        include: {
-          user: { include: { prefix: true, imageMedia: true } },
-        },
-      });
-      return professor as unknown as Professor | null;
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === "P2025") {
-          return null;
-        }
-      }
-      throw new AppError(
-        ErrorCode.DATABASE_ERROR,
-        "Database error occurred",
-        HttpStatusCode.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
   async updateProfessor(professorID: number, data: ProfessorUpdatePayload ): Promise<Professor> {
     const { educations, ...professorData } = data;
     const professor = await this.db.professor.update({
