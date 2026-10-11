@@ -38,6 +38,7 @@ export const CreateStudentDTO = t.Object({
 
 export const StudentProfileDTO = t.Object({
   id: t.Number(),
+  prefix: t.Optional(t.Nullable(PrefixSchema)),
   ...CommonStudentFields,
   classBookID: t.Nullable(t.Number()),
   skills: t.Array(t.String()),
