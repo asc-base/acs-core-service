@@ -15,11 +15,24 @@ import { PrismaInstance } from "../lib/db";
 const professorViewWhere = (
   query: ProfessorQueryParams,
 ): Prisma.UserProfessorViewWhereInput => {
-  if (!query.search || !query.searchBy) return {};
+  const group: Prisma.UserProfessorViewWhereInput = query.personnelGroup
+    ? {
+        professor: {
+          is: query.personnelGroup === "staff"
+            ? { personnelType: "CURRICULUM_STAFF" }
+            : { OR: [
+                { personnelType: null },
+                { personnelType: { in: ["CURRICULUM_HEAD", "LECTURER"] } },
+              ] },
+        },
+      }
+    : {};
+  if (!query.search || !query.searchBy) return group;
   const search = { contains: query.search, mode: "insensitive" as const };
-  return query.searchBy === "firstNameTh"
+  const searchWhere = query.searchBy === "firstNameTh"
     ? { firstNameTh: search }
     : { professor: { is: { [query.searchBy]: search } } };
+  return { AND: [group, searchWhere] };
 };
 
 const educationInclude = { orderBy: { sequence: "asc" as const } };

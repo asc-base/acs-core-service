@@ -130,6 +130,12 @@ Table public.students {
   }
 }
 
+Enum public.professor_personnel_type {
+  CURRICULUM_HEAD
+  LECTURER
+  CURRICULUM_STAFF
+}
+
 Table public.professors {
   id int [pk, not null]
 
@@ -140,6 +146,7 @@ Table public.professors {
   expert_fields text [note: 'Legacy field']
   educations text [note: 'Legacy field']
   research_profile text
+  personnel_type public.professor_personnel_type
 
   created_at timestamp [not null]
   updated_at timestamp

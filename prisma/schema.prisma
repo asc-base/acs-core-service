@@ -334,6 +334,15 @@ model Curriculum {
   @@schema("public")
 }
 
+enum ProfessorPersonnelType {
+  CURRICULUM_HEAD
+  LECTURER
+  CURRICULUM_STAFF
+
+  @@map("professor_personnel_type")
+  @@schema("public")
+}
+
 model Professor {
   id                 Int       @id @default(autoincrement()) @map("id")
   userID             Int       @unique @map("user_id")
@@ -341,6 +350,7 @@ model Professor {
   phone              String    @map("phone")
   expertFields       String?   @map("expert_fields")
   researchProfile    String?   @map("research_profile")
+  personnelType      ProfessorPersonnelType? @map("personnel_type")
   createdAt          DateTime  @default(now()) @map("created_at")
   deletedAt          DateTime? @map("deleted_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")

@@ -15,6 +15,7 @@ export class ProfessorFactory implements IProfessorFactory {
         id: professor.id,
         profRoom: professor.profRoom,
         phone: professor.phone,
+        personnelType: professor.personnelType ?? null,
         research_profile: professor.researchProfile ?? null,
         expertFields: professor.expertFields
           ? professor.expertFields.split("/").map((field) => field.trim()).filter((field) => field.length > 0)

@@ -7,9 +7,16 @@ import {
 } from "../../users/domain/user";
 import { EducationSchema } from "./education";
 
+export const ProfessorPersonnelTypeSchema = t.Union([
+  t.Literal("CURRICULUM_HEAD"),
+  t.Literal("LECTURER"),
+  t.Literal("CURRICULUM_STAFF"),
+]);
+
 export const CommonProfessorFields = {
   phone: t.String(),
   profRoom: t.String(),
+  personnelType: t.Optional(t.Nullable(ProfessorPersonnelTypeSchema)),
 };
 
 export const ProfessorSchema = t.Intersect([
@@ -68,6 +75,7 @@ export const ProfessorDTO = t.Intersect([
 
 export const ProfessorQueryParams = t.Object({
   ...CommonQueryParams,
+  personnelGroup: t.Optional(t.Union([t.Literal("academic"), t.Literal("staff")])),
   search: t.Optional(t.String()),
   searchBy: t.Optional(t.String()),
 });
@@ -99,6 +107,7 @@ export const ProfessorUpdateDTO = t.Partial(
 );
 
 export const ProfessorCreatePayloadSchema = t.Object({
+  personnelType: t.Optional(t.Nullable(ProfessorPersonnelTypeSchema)),
   phone: t.String(),
   profRoom: t.String(),
   expertFields: t.Optional(t.Nullable(t.String())),
@@ -109,6 +118,7 @@ export const ProfessorCreatePayloadSchema = t.Object({
 
 export const ProfessorUpdatePayloadSchema = t.Partial(
   t.Object({
+    personnelType: t.Optional(t.Nullable(ProfessorPersonnelTypeSchema)),
     phone: t.String(),
     profRoom: t.String(),
     expertFields: t.Optional(t.Nullable(t.String())),

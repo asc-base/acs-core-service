@@ -236,6 +236,7 @@ export class ProfessorService implements IProfessorService {
       educations,
       expertFields,
       research_profile,
+      personnelType,
       ...UserData
     } = data;
     const existing = await this.professorRepository.getProfessorById(professorID);
@@ -250,6 +251,7 @@ export class ProfessorService implements IProfessorService {
       }
 
       const updatedProfessor: ProfessorUpdatePayload = {
+        ...(personnelType !== undefined && { personnelType }),
         ...(phone !== undefined && { phone }),
         ...(profRoom !== undefined && { profRoom }),
         ...(educations !== undefined && {
