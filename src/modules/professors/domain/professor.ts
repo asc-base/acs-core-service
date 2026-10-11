@@ -5,11 +5,18 @@ import {
   UserSchema,
   FocalPointInputFields,
 } from "../../users/domain/user";
-import { PrefixSchema } from "../../../core/models/prefix";
+import { EducationSchema } from "./education";
+
+export const ProfessorPersonnelTypeSchema = t.Union([
+  t.Literal("CURRICULUM_HEAD"),
+  t.Literal("LECTURER"),
+  t.Literal("CURRICULUM_STAFF"),
+]);
 
 export const CommonProfessorFields = {
   phone: t.String(),
   profRoom: t.String(),
+  personnelType: t.Optional(t.Nullable(ProfessorPersonnelTypeSchema)),
 };
 
 export const ProfessorSchema = t.Intersect([
@@ -17,7 +24,7 @@ export const ProfessorSchema = t.Intersect([
     id: t.Number(),
     userID: t.Number(),
     expertFields: t.Optional(t.Nullable(t.String())),
-    educations: t.Optional(t.Nullable(t.String())),
+    educations: t.Array(EducationSchema),
     researchProfile: t.Optional(t.Nullable(t.String())),
     ...CommonProfessorFields,
     user: UserSchema,
@@ -53,18 +60,22 @@ export const CreateProfessorDTO = t.Object({
   research_profile: t.Optional(t.Nullable(t.String())),
 });
 
-export const ProfessorDTO = t.Object({
+export const ProfessorProfileDTO = t.Object({
   id: t.Number(),
   ...CommonProfessorFields,
   expertFields: t.Array(t.String()),
   educations: t.Array(t.String()),
   research_profile: t.Nullable(t.String()),
-  prefix: t.Optional(t.Nullable(PrefixSchema)),
-  user: UserSchema,
 });
+
+export const ProfessorDTO = t.Intersect([
+  UserSchema,
+  t.Object({ professor: ProfessorProfileDTO }),
+]);
 
 export const ProfessorQueryParams = t.Object({
   ...CommonQueryParams,
+  personnelGroup: t.Optional(t.Union([t.Literal("academic"), t.Literal("staff")])),
   search: t.Optional(t.String()),
   searchBy: t.Optional(t.String()),
 });
@@ -96,20 +107,22 @@ export const ProfessorUpdateDTO = t.Partial(
 );
 
 export const ProfessorCreatePayloadSchema = t.Object({
+  personnelType: t.Optional(t.Nullable(ProfessorPersonnelTypeSchema)),
   phone: t.String(),
   profRoom: t.String(),
   expertFields: t.Optional(t.Nullable(t.String())),
-  educations: t.Optional(t.Nullable(t.String())),
+  educations: t.Optional(t.Array(t.String())),
   researchProfile: t.Optional(t.Nullable(t.String())),
   userID: t.Number(),
 });
 
 export const ProfessorUpdatePayloadSchema = t.Partial(
   t.Object({
+    personnelType: t.Optional(t.Nullable(ProfessorPersonnelTypeSchema)),
     phone: t.String(),
     profRoom: t.String(),
     expertFields: t.Optional(t.Nullable(t.String())),
-    educations: t.Optional(t.Nullable(t.String())),
+    educations: t.Optional(t.Array(t.String())),
     researchProfile: t.Optional(t.Nullable(t.String())),
     deletedAt: t.Optional(t.Nullable(t.Date())),
   }),

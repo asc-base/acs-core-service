@@ -20,9 +20,6 @@ export const ProfessorDocs = {
       if (body.expertFields != null && body.expertFields !== "") {
         body.expertFields = body.expertFields.replaceAll(",", "/");
       }
-      if (body.educations != null && body.educations !== "") {
-        body.educations = body.educations.replaceAll(",", "/");
-      }
       if (body.research_profile != null) {
         body.research_profile = body.research_profile.trim() || null;
       }
@@ -47,9 +44,8 @@ export const ProfessorDocs = {
   },
   getProfessorById: {
     detail: {
-      summary: "Retrieves a professor by ID.",
-      description:
-        "This endpoint fetches the details of a specific professor using their unique ID.",
+      summary: "Retrieves a professor by user ID.",
+      description: "Retrieves a user and their professor profile by user ID.",
       tags: ["Professors"],
     },
     params: t.Object({
@@ -62,17 +58,13 @@ export const ProfessorDocs = {
   },
   updateProfessor: {
     detail: {
-      summary: "Updates an existing professor's details.",
-      description:
-        "This endpoint allows for updating the details of an existing professor by their ID.",
+      summary: "Updates a professor profile by user ID.",
+      description: "Updates a user's professor profile by user ID.",
       tags: ["Professors"],
     },
     transform({ body }: { body: ProfessorUpdateDTO }) {
       if (body.expertFields != null && body.expertFields !== "") {
         body.expertFields = body.expertFields.replaceAll(",", "/");
-      }
-      if (body.educations != null && body.educations !== "") {
-        body.educations = body.educations.replaceAll(",", "/");
       }
       if (body.research_profile != null) {
         body.research_profile = body.research_profile.trim();
@@ -80,7 +72,13 @@ export const ProfessorDocs = {
 
       Object.keys(body).forEach((key) => {
         const k = key as keyof ProfessorUpdateDTO;
-        if (body[k] === "" && k !== "research_profile") {
+        if (body[k] === "" && k === "educations") return;
+        if (
+          body[k] === "" &&
+          ["firstNameEn", "lastNameEn", "nickName", "expertFields"].includes(k)
+        ) {
+          (body as Record<string, unknown>)[k] = null;
+        } else if (body[k] === "" && k !== "research_profile") {
           body[k] = undefined;
         }
       });
@@ -96,8 +94,8 @@ export const ProfessorDocs = {
   },
   deleteProfessor: {
     detail: {
-      summary: "Delete professor by ID.",
-      description: "Delete a specific professor by ID.",
+      summary: "Delete a professor profile by user ID.",
+      description: "Soft-delete a user's professor profile by user ID.",
       tags: ["Professors"],
     },
     params: t.Object({

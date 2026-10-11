@@ -12,4 +12,13 @@ export const errorPlugin = (app: Elysia) =>
         err: error.type,
       };
     }
+
+    console.error("Unhandled API error", {
+      type: error instanceof Error ? error.name : typeof error,
+      code:
+        error && typeof error === "object" && "code" in error
+          ? error.code
+          : undefined,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
   });

@@ -22,7 +22,10 @@ export const CommonQueryParams = {
   page: t.Optional(t.Numeric({ default: 1, minimum: 1, examples: [1] })),
   pageSize: t.Optional(t.Numeric({ default: 10, minimum: 1, examples: [10] })),
   orderBy: t.Optional(
-    t.String({ default: "createdAt", examples: ["createdAt", "name"] }),
+    t.String({
+      default: "createdAt",
+      examples: ["createdAt", "name", "displayNameTh"],
+    }),
   ),
   sortBy: t.Optional(t.String({ default: "desc", examples: ["asc", "desc"] })),
 };

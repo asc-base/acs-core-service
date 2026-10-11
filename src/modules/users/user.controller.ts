@@ -8,15 +8,15 @@ import { userDocs } from "./user.docs";
 import { UserFactory } from "./user.factory";
 import { authMiddleware } from "../../middleware/auth";
 import { HttpStatusCode } from "../../core/types/http";
-import { AuthRepository } from "../../infrastructure/auth.repository";
+import { PrismaUnitOfWorkRepository } from "../../infrastructure/prisma-uow.repository";
 
 const userFactory = new UserFactory();
 const userRepository = new UserRepository(prisma);
-const authRepository = new AuthRepository(prisma);
+const unitOfWork = new PrismaUnitOfWorkRepository(prisma);
 const userService = new UserService(
   userRepository,
   userFactory,
-  authRepository,
+  unitOfWork,
 );
 
 export const userController = (app: Elysia) =>

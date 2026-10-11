@@ -68,12 +68,12 @@ describe("professor research profile", () => {
       profRoom: "1/1",
       phone: "0123456789",
       expertFields: null,
-      educations: null,
+      educations: [],
       researchProfile: "https://example.edu/research",
       user: { prefix: null },
     } as never);
 
-    expect(result.research_profile).toBe("https://example.edu/research");
+    expect(result.professor.research_profile).toBe("https://example.edu/research");
   });
 
   test("creates professors with a URL or null when omitted", async () => {

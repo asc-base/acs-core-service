@@ -12,14 +12,53 @@ import { ErrorCode } from "../core/types/errors";
 import { HttpStatusCode } from "../core/types/http";
 import { PrismaInstance } from "../lib/db";
 
+const professorViewWhere = (
+  query: ProfessorQueryParams,
+): Prisma.UserProfessorViewWhereInput => {
+  const group: Prisma.UserProfessorViewWhereInput = query.personnelGroup
+    ? {
+        professor: {
+          is: query.personnelGroup === "staff"
+            ? { personnelType: "CURRICULUM_STAFF" }
+            : { OR: [
+                { personnelType: null },
+                { personnelType: { in: ["CURRICULUM_HEAD", "LECTURER"] } },
+              ] },
+        },
+      }
+    : {};
+  if (!query.search || !query.searchBy) return group;
+  const search = { contains: query.search, mode: "insensitive" as const };
+  const searchWhere = query.searchBy === "firstNameTh"
+    ? { firstNameTh: search }
+    : { professor: { is: { [query.searchBy]: search } } };
+  return { AND: [group, searchWhere] };
+};
+
+const educationInclude = { orderBy: { sequence: "asc" as const } };
+
+type ProfessorViewRow = Prisma.UserProfessorViewGetPayload<{
+  include: { professor: { include: { educations: true } }; prefix: true; imageMedia: true };
+}>;
+
+const toProfessor = ({ professor, prefix, imageMedia, ...user }: ProfessorViewRow) =>
+  ({ ...professor, user: { ...user, prefix, imageMedia } }) as Professor;
+
 export class ProfessorRepository implements IProfessorRepository {
   constructor(private readonly db: PrismaInstance) {}
 
   async createProfessor(data: ProfessorCreatePayload,): Promise<Professor> {
+    const { educations = [], ...professorData } = data;
     const professor = await this.db.professor.create({
-      data,
+      data: {
+        ...professorData,
+        educations: {
+          create: educations.map((education, sequence) => ({ education, sequence })),
+        },
+      },
       include: {
         user: { include: { prefix: true, imageMedia: true } },
+        educations: educationInclude,
       },
     });
     return professor as unknown as Professor;
@@ -31,47 +70,70 @@ export class ProfessorRepository implements IProfessorRepository {
       pageSize = 10,
       orderBy = "createdAt",
       sortBy = "asc",
-      search,
-      searchBy,
     } = query;
+    const order = { [orderBy]: sortBy as Prisma.SortOrder };
+    const professorOrder =
+      orderBy === "displayNameTh"
+        ? [
+            { isCurriculumHead: "desc" as const },
+            { displayNameTh: sortBy as Prisma.SortOrder },
+            { id: "asc" as const },
+          ]
+        : [
+            ["firstNameTh", "lastNameTh", "firstNameEn", "lastNameEn", "email"].includes(orderBy)
+              ? order
+              : { professor: order },
+          ];
 
-    let searchCondition = {};
-    if (search && searchBy && searchBy === "firstNameTh") {
-      searchCondition = {
-        user: { firstNameTh: { contains: search, mode: "insensitive" } },
-      };
-    } else if (search && searchBy) {
-      searchCondition = {
-        [searchBy]: { contains: search, mode: "insensitive" },
-      };
-    }
-
-    const professors = await this.db.professor.findMany({
+    const rows = await this.db.userProfessorView.findMany({
       skip: calculatePagination(page, pageSize),
       take: pageSize,
-      orderBy: {
-        [orderBy]: sortBy,
-      },
-      where: {
-        deletedAt: null,
-        ...searchCondition,
-      },
+      orderBy: professorOrder,
+      where: professorViewWhere(query),
       include: {
-        user: { include: { prefix: true, imageMedia: true } },
+        professor: { include: { educations: educationInclude } },
+        prefix: true,
+        imageMedia: true,
       },
     });
-    return professors as unknown as Professor[];
+    return rows.map(toProfessor);
   }
 
   async getProfessorById(id: number): Promise<Professor | null> {
     try {
-      const professor = await this.db.professor.findUnique({
-        where: { id, deletedAt: null },
+      const row = await this.db.userProfessorView.findUnique({
+        where: { id },
         include: {
-          user: { include: { prefix: true, imageMedia: true } },
+          professor: { include: { educations: educationInclude } },
+          prefix: true,
+          imageMedia: true,
         },
       });
-      return professor as Professor | null;
+      return row ? toProfessor(row) : null;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2025") {
+          return null;
+        }
+      }
+      throw new AppError(
+        ErrorCode.DATABASE_ERROR,
+        "Database error occurred",
+        HttpStatusCode.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async getProfessorByUserId(userID: number): Promise<Professor | null> {
+    try {
+      const professor = await this.db.professor.findUnique({
+        where: { userID },
+        include: {
+          user: { include: { prefix: true, imageMedia: true } },
+          educations: educationInclude,
+        },
+      });
+      return professor as unknown as Professor | null;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === "P2025") {
@@ -110,43 +172,42 @@ export class ProfessorRepository implements IProfessorRepository {
   }
 
   async updateProfessor(professorID: number, data: ProfessorUpdatePayload ): Promise<Professor> {
+    const { educations, ...professorData } = data;
     const professor = await this.db.professor.update({
       where: { id: professorID },
-      data,
+      data: {
+        ...professorData,
+        ...(educations !== undefined && {
+          educations: {
+            deleteMany: {},
+            create: educations.map((education, sequence) => ({ education, sequence })),
+          },
+        }),
+      },
       include: {
         user: { include: { prefix: true, imageMedia: true } },
+        educations: educationInclude,
       },
     });
     return professor as unknown as Professor;
   }
 
-  // async assignEducation(
-  //   data: Prisma.EducationUncheckedCreateInput,
-  // ): Promise<Education> {
-  //   const education = await this.prisma.education.create({
-  //     data,
-  //   });
-  //   return education;
-  // }
-
   async countProfessors(query: ProfessorQueryParams): Promise<number> {
-    const count = await this.db.professor.count({
-      where: {
-        deletedAt: null,
-      },
-    });
-    return count;
+    return this.db.userProfessorView.count({ where: professorViewWhere(query) });
   }
 
-  async deleteProfessor(professorID: number): Promise<Professor | null> {
+  async deleteProfessor(userID: number): Promise<Professor | null> {
+    const existing = await this.getProfessorById(userID);
+    if (!existing) return null;
     try {
       const professor = await this.db.professor.update({
-        where: { id: professorID },
+        where: { id: existing.id },
         data: {
           deletedAt: new Date(),
         },
         include: {
           user: { include: { prefix: true, imageMedia: true } },
+          educations: educationInclude,
         },
       });
       return professor as unknown as Professor;

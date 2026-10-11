@@ -10,6 +10,34 @@ import { calculatePagination } from "../core/utils/calculator";
 import { AppError } from "../core/error/app-error";
 import { ErrorCode } from "../core/types/errors";
 import { PrismaInstance } from "../lib/db";
+
+const studentViewWhere = (
+  query: StudentQueryParams,
+): Prisma.UserStudentViewWhereInput => ({
+  ...(query.classBookID && {
+    student: { is: { classBookID: query.classBookID } },
+  }),
+  ...(query.search && {
+    OR: [
+      {
+        student: {
+          is: {
+            studentCode: { contains: query.search, mode: "insensitive" },
+          },
+        },
+      },
+      { firstNameTh: { contains: query.search, mode: "insensitive" } },
+    ],
+  }),
+});
+
+type StudentViewRow = Prisma.UserStudentViewGetPayload<{
+  include: { student: true; prefix: true; imageMedia: true };
+}>;
+
+const toStudent = ({ student, prefix, imageMedia, ...user }: StudentViewRow) =>
+  ({ ...student, user: { ...user, prefix, imageMedia } }) as Student;
+
 export class StudentRepository implements IStudentRepository {
   constructor(private readonly db: PrismaInstance) { }
 
@@ -45,59 +73,34 @@ export class StudentRepository implements IStudentRepository {
   }
 
   async getStudents(query: StudentQueryParams): Promise<Student[]> {
-    const {
-      page = 1,
-      pageSize = 10,
-      orderBy = "createdAt",
-      sortBy,
-      search,
-      classBookID,
-    } = query;
+    const { page = 1, pageSize = 10, orderBy = "createdAt", sortBy } = query;
 
-    const students = await this.db.student.findMany({
+    const order = { [orderBy]: sortBy as Prisma.SortOrder };
+    const rows = await this.db.userStudentView.findMany({
       skip: calculatePagination(page, pageSize),
       take: pageSize,
-      where: {
-        ...(classBookID && { classBookID }),
-        deletedAt: null,
-        ...(search && {
-          OR: [
-            {
-              studentCode: {
-                contains: search,
-                mode: "insensitive",
-              },
-            },
-            {
-              user: {
-                firstNameTh: {
-                  contains: search,
-                  mode: "insensitive",
-                },
-              },
-            },
-          ],
-        }),
-      },
-      orderBy: {
-        [orderBy]: sortBy,
-      },
+      where: studentViewWhere(query),
+      orderBy: orderBy === "firstNameTh" ? order : { student: order },
       include: {
-        user: { include: { prefix: true, imageMedia: true } },
+        student: true,
+        prefix: true,
+        imageMedia: true,
       },
     });
-    return students as Student[];
+    return rows.map(toStudent);
   }
 
   async getStudentById(id: number): Promise<Student | null> {
     try {
-      const student = await this.db.student.findUnique({
-        where: { id, deletedAt: null },
+      const row = await this.db.userStudentView.findUnique({
+        where: { id },
         include: {
-          user: { include: { prefix: true, imageMedia: true } },
+          student: true,
+          prefix: true,
+          imageMedia: true,
         },
       });
-      return student as Student | null;
+      return row ? toStudent(row) : null;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === "P2025") {
@@ -113,27 +116,7 @@ export class StudentRepository implements IStudentRepository {
   }
 
   async getStudentByUserId(userId: number): Promise<Student | null> {
-    try {
-      const student = await this.db.student.findFirst({
-        where: { user: { id: userId, deletedAt: null }, deletedAt: null },
-        include: {
-          user: { include: { prefix: true, imageMedia: true } },
-          classBook: true,
-        },
-      });
-      return student as Student | null;
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === "P2025") {
-          return null;
-        }
-      }
-      throw new AppError(
-        ErrorCode.DATABASE_ERROR,
-        "An error occurred while fetching the student",
-        500,
-      );
-    }
+    return this.getStudentById(userId);
   }
 
   async deleteStudent(id: number): Promise<Student> {
@@ -190,30 +173,6 @@ export class StudentRepository implements IStudentRepository {
   }
 
   async countStudents(query: StudentQueryParams): Promise<number> {
-    const count = await this.db.student.count({
-      where: {
-        ...(query.classBookID && { classBookID: query.classBookID }),
-        deletedAt: null,
-        ...(query.search && {
-          OR: [
-            {
-              studentCode: {
-                contains: query.search,
-                mode: "insensitive",
-              },
-            },
-            {
-              user: {
-                firstNameTh: {
-                  contains: query.search,
-                  mode: "insensitive",
-                },
-              },
-            },
-          ],
-        }),
-      },
-    });
-    return count;
+    return this.db.userStudentView.count({ where: studentViewWhere(query) });
   }
 }

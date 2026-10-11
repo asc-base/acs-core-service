@@ -8,6 +8,7 @@ import { errorPlugin } from "../core/plugins/error";
 import { cors } from "@elysiajs/cors";
 import { config } from "../core/config/config";
 import { auth } from "../lib/auth";
+import { logRequest, requestLogger } from "../core/plugins/request-logger";
 export class Server {
   constructor(
     private readonly port: number,
@@ -20,6 +21,7 @@ export class Server {
       .use(openapi(openapiConfig))
       .use(responseEnhancer)
       .use(errorPlugin)
+      .use(requestLogger)
       .use(
         cors({
           origin:
@@ -32,12 +34,12 @@ export class Server {
         }),
       )
       .onRequest(({ request }) => {
-        console.info(`${request.method} ${new URL(request.url).pathname}`);
         const { pathname } = new URL(request.url);
         const isNewsUpload = (request.method === "POST" && pathname === "/api/v1/news")
           || (request.method === "PATCH" && /^\/api\/v1\/news\/\d+$/.test(pathname));
         const contentLength = Number(request.headers.get("content-length"));
         if (isNewsUpload && contentLength > 64 * 1024 * 1024) {
+          logRequest(request, 413);
           return new Response("News uploads are limited to 64 MiB", { status: 413 });
         }
       })

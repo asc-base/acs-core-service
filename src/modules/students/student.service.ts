@@ -168,7 +168,11 @@ export class StudentService implements IStudentService {
   }
 
   async deleteStudent(id: number): Promise<StudentDTO> {
-    const student = await this.studentRepository.deleteStudent(id);
+    const existing = await this.studentRepository.getStudentById(id);
+    if (!existing) {
+      throw new AppError(ErrorCode.NOT_FOUND_ERROR, "Student not found", 404);
+    }
+    const student = await this.studentRepository.deleteStudent(existing.id);
     return this.studentFactory.MapStudentToDTO(student);
   }
 
@@ -190,14 +194,12 @@ export class StudentService implements IStudentService {
       imageFocalPointY,
       ...userData
     } = data;
-    if (!actor.isAdmin) {
-      const existing = await this.studentRepository.getStudentById(studentID);
-      if (!existing) {
-        throw new AppError(ErrorCode.NOT_FOUND_ERROR, "Student not found", 404);
-      }
-      if (existing.userID !== actor.userID) {
-        throw new AppError(ErrorCode.AUTHORIZATION_ERROR, "Forbidden", 403);
-      }
+    const existing = await this.studentRepository.getStudentById(studentID);
+    if (!existing) {
+      throw new AppError(ErrorCode.NOT_FOUND_ERROR, "Student not found", 404);
+    }
+    if (!actor.isAdmin && existing.userID !== actor.userID) {
+      throw new AppError(ErrorCode.AUTHORIZATION_ERROR, "Forbidden", 403);
     }
 
     let storedImage: StoredImage | null = null;
@@ -215,7 +217,12 @@ export class StudentService implements IStudentService {
         facebook,
         instagram,
         classBookID,
-        skills: skills ? skills.join(",") : null,
+        skills:
+          skills === undefined
+            ? undefined
+            : Array.isArray(skills)
+              ? skills.join(",")
+              : null,
       };
 
       const student = await this.unitOfWork.runInTransaction(async (tx) => {
@@ -232,12 +239,14 @@ export class StudentService implements IStudentService {
           ...(image && {
             imageID: image.id,
             imageUrl: storedImage!.imageUrl,
-            imageFocalPointX: imageFocalPointX ?? null,
-            imageFocalPointY: imageFocalPointY ?? null,
+            imageFocalPointX:
+              imageFocalPointX ?? existing.user.imageFocalPointX ?? null,
+            imageFocalPointY:
+              imageFocalPointY ?? existing.user.imageFocalPointY ?? null,
           }),
           ...(!image && { imageFocalPointX, imageFocalPointY }),
         };
-        const updated = await tx.student.updateStudent(studentID, updateStudentData);
+        const updated = await tx.student.updateStudent(existing.id, updateStudentData);
         const updateUser = await tx.user.updateUser(updated.userID, updatedUserData);
         updated.user = updateUser;
         return this.studentFactory.MapStudentToDTO(updated);
