@@ -1,31 +1,34 @@
 import { t, Static } from "elysia";
 import { BaseModelSchema, CommonQueryParams } from "../../../core/models";
 import { PrefixSchema } from "../../../core/models/prefix";
-import { UserSchema, CommonUserFields, UserDTO, FocalPointInputFields } from "../../users/domain/user";
+import {
+  UserSchema,
+  CommonUserFields,
+  UserDTO,
+  FocalPointInputFields,
+} from "../../users/domain/user";
+import { StudentPlain } from "../../../generated/prismabox/Student";
 
 export const CommonStudentFields = {
-  studentCode: t.String(),
-  linkedin: t.Optional(t.Nullable(t.String())),
-  github: t.Optional(t.Nullable(t.String())),
-  facebook: t.Optional(t.Nullable(t.String())),
-  instagram: t.Optional(t.Nullable(t.String())),
+  ...t.Pick(StudentPlain, ["studentCode"]).properties,
+  linkedin: t.Optional(StudentPlain.properties.linkedin),
+  github: t.Optional(StudentPlain.properties.github),
+  facebook: t.Optional(StudentPlain.properties.facebook),
+  instagram: t.Optional(StudentPlain.properties.instagram),
 };
 
-export const StudentSchema = t.Intersect([
-  t.Object({
-    id: t.Number(),
-    userID: t.Number(),
-    ...CommonStudentFields,
-    user: UserSchema,
-    classBookID: t.Nullable(t.Number()),
-    skills: t.Optional(t.Nullable(t.String())),
-  }),
-  BaseModelSchema,
-]);
+export const StudentSchema = t.Object({
+  ...t.Pick(StudentPlain, ["id", "userID"]).properties,
+  ...CommonStudentFields,
+  user: UserSchema,
+  classBookID: StudentPlain.properties.classBookID,
+  skills: t.Optional(StudentPlain.properties.skills),
+  ...BaseModelSchema.properties,
+});
 
 export const CreateStudentModel = t.Object({
   ...CommonStudentFields,
-  classBookID: t.Number(),
+  ...t.Pick(StudentPlain, ["classBookID"]).properties,
 });
 
 export const CreateStudentDTO = t.Object({
@@ -38,17 +41,17 @@ export const CreateStudentDTO = t.Object({
 });
 
 export const StudentProfileDTO = t.Object({
-  id: t.Number(),
+  ...t.Pick(StudentPlain, ["id"]).properties,
   prefix: t.Optional(t.Nullable(PrefixSchema)),
   ...CommonStudentFields,
-  classBookID: t.Nullable(t.Number()),
+  classBookID: StudentPlain.properties.classBookID,
   skills: t.Array(t.String()),
 });
 
-export const StudentDTO = t.Intersect([
-  UserDTO,
-  t.Object({ student: StudentProfileDTO }),
-]);
+export const StudentDTO = t.Object({
+  ...UserDTO.properties,
+  student: StudentProfileDTO,
+});
 
 export const StudentQueryParams = t.Object({
   ...CommonQueryParams,
@@ -78,28 +81,22 @@ export const StudentBatchUploadDTO = t.Object({
   classBookID: t.Numeric(),
 });
 
-export const StudentCreatePayloadSchema = t.Intersect([
-  t.Object({
-    id: t.Optional(t.Number()),
-    classBookID: t.Number(),
-    userID: t.Number(),
-    ...CommonStudentFields,
-    skills: t.Optional(t.Nullable(t.String())),
-  }),
-  BaseModelSchema,
-]);
+export const StudentCreatePayloadSchema = t.Object({
+  ...t.Partial(t.Pick(StudentPlain, ["id"])).properties,
+  ...t.Pick(StudentPlain, ["classBookID", "userID"]).properties,
+  ...CommonStudentFields,
+  skills: t.Optional(StudentPlain.properties.skills),
+  ...BaseModelSchema.properties,
+});
 
-export const StudentUpdatePayloadSchema = t.Intersect([
-  t.Object({
-    id: t.Optional(t.Number()),
-    classBookID: t.Optional(t.Number()),
-    userID: t.Optional(t.Number()),
-    ...CommonStudentFields,
-    studentCode: t.Optional(t.String()),
-    skills: t.Optional(t.Nullable(t.String())),
-  }),
-  BaseModelSchema,
-]);
+export const StudentUpdatePayloadSchema = t.Object({
+  ...t.Partial(t.Pick(StudentPlain, ["id", "classBookID", "userID"]))
+    .properties,
+  ...CommonStudentFields,
+  studentCode: t.Optional(t.String()),
+  skills: t.Optional(StudentPlain.properties.skills),
+  ...BaseModelSchema.properties,
+});
 
 export type Student = Static<typeof StudentSchema>;
 export type CreateStudentDTO = Static<typeof CreateStudentDTO>;

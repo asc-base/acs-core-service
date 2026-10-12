@@ -10,7 +10,7 @@ export class ProjectFactory implements IProjectFactory {
   constructor(
     private readonly userFactory: IUserFactory,
     private readonly courseFactory: ICourseFactory,
-  ) { }
+  ) {}
   mapProjectToDTO(project: Project): ProjectDTO {
     return {
       id: project.id,
@@ -23,7 +23,7 @@ export class ProjectFactory implements IProjectFactory {
       githubURL: project.githubURL,
       presentationURL: project.presentationURL,
       documentURL: project.documentURL,
-      figmaURL: project.figmaURL,
+      figmaURL: project.figmaURL ?? undefined,
       youtubeURL: project.youtubeURL,
       assetsURL: project.assetsURL ? project.assetsURL.split(",") : [],
       images: (project.images ?? []).map(({ sortOrder, image }) => ({
@@ -33,13 +33,10 @@ export class ProjectFactory implements IProjectFactory {
       })),
       techStacks: project.techStacks ? project.techStacks.split(",") : [],
 
-      tag: project.projectTags?.map(({ tag }) => ({
-        id: tag.id,
-        name: tag.name,
-        tagsGroupsId: tag.tageGroupsId,
-      })) || [],
       fields: (project.projectFields ?? []).map(({ field }) => field),
-      categories: (project.projectCategories ?? []).map(({ category }) => category),
+      categories: (project.projectCategories ?? []).map(
+        ({ category }) => category,
+      ),
       projectTypes: (project.projectProjectTypes ?? []).map(({ type }) => type),
 
       member:
@@ -52,7 +49,8 @@ export class ProjectFactory implements IProjectFactory {
         })) ?? [],
 
       course: this.courseFactory.mapCourseListToDTO(
-        project.projectCourses?.map((projectCourse) => projectCourse.course) || []
+        project.projectCourses?.map((projectCourse) => projectCourse.course) ||
+          [],
       ),
     };
   }

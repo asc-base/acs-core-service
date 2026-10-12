@@ -1,8 +1,6 @@
-import { Static, t } from "elysia";
+import { Static } from "elysia";
+import { RolePlain } from "../../generated/prismabox/Role";
 
-export const RoleSchema = t.Object({
-  id: t.Number(),
-  name: t.String(),
-});
+export const RoleSchema = RolePlain;
 
 export type Role = Static<typeof RoleSchema>;

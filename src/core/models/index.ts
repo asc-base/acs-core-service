@@ -1,9 +1,5 @@
 import { t, type TSchema, Static } from "elysia";
-export interface BaseModel {
-  createdAt?: Date;
-  updatedAt?: Date;
-  deletedAt?: Date | null;
-}
+import { UserPlain } from "../../generated/prismabox/User";
 
 export interface ResponseModel<T> {
   data: T;
@@ -12,11 +8,11 @@ export interface ResponseModel<T> {
   err?: string;
 }
 
-export const BaseModelSchema = t.Object({
-  createdAt: t.Optional(t.Date()),
-  updatedAt: t.Optional(t.Date()),
-  deletedAt: t.Optional(t.Nullable(t.Date())),
-});
+export const BaseModelSchema = t.Partial(
+  t.Pick(UserPlain, ["createdAt", "updatedAt", "deletedAt"]),
+);
+
+export type BaseModel = Static<typeof BaseModelSchema>;
 
 export const CommonQueryParams = {
   page: t.Optional(t.Numeric({ default: 1, minimum: 1, examples: [1] })),

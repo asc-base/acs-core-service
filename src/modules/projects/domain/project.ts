@@ -1,18 +1,37 @@
 import { t, Static } from "elysia";
 import { BaseModelSchema, CommonQueryParams } from "../../../core/models";
-import { Tag } from "../../../core/models/tag";
 import { UserSchema } from "../../users/domain/user";
-import { CourseSchema, CourseDTO as CourseDTOSchema } from "../../courses/domain/course";
+import {
+  CourseSchema,
+  CourseDTO as CourseDTOSchema,
+} from "../../courses/domain/course";
 import { RoleSchema } from "../../../core/models/role";
-import { ImageMediaSchema, StoredImageMedia } from "../../users/domain/image-media";
+import {
+  ImageMediaSchema,
+  StoredImageMedia,
+} from "../../users/domain/image-media";
+import { ProjectPlain } from "../../../generated/prismabox/Project";
+import { ProjectMemberPlain } from "../../../generated/prismabox/ProjectMember";
+import { ProjectCoursePlain } from "../../../generated/prismabox/ProjectCourse";
+import { ProjectImagePlain } from "../../../generated/prismabox/ProjectImage";
+import { ProjectFieldPlain } from "../../../generated/prismabox/ProjectField";
+import { ProjectCategoryPlain } from "../../../generated/prismabox/ProjectCategory";
+import { ProjectProjectTypePlain } from "../../../generated/prismabox/ProjectProjectType";
+import { FieldPlain } from "../../../generated/prismabox/Field";
+import { CategoryPlain } from "../../../generated/prismabox/Category";
+import { ProjectTypePlain } from "../../../generated/prismabox/ProjectType";
 
 const FocalPointInputFields = {
   thumbnailFocalPointX: t.Optional(t.Numeric()),
   thumbnailFocalPointY: t.Optional(t.Numeric()),
 };
 const FocalPointResponseFields = {
-  thumbnailFocalPointX: t.Optional(t.Nullable(t.Number())),
-  thumbnailFocalPointY: t.Optional(t.Nullable(t.Number())),
+  thumbnailFocalPointX: t.Optional(
+    ProjectPlain.properties.thumbnailFocalPointX,
+  ),
+  thumbnailFocalPointY: t.Optional(
+    ProjectPlain.properties.thumbnailFocalPointY,
+  ),
 };
 
 const ProjectImageDTO = t.Object({
@@ -21,179 +40,204 @@ const ProjectImageDTO = t.Object({
   sortOrder: t.Number(),
 });
 
+const ProjectFieldSchema = t.Object({
+  ...ProjectFieldPlain.properties,
+  field: FieldPlain,
+});
+const ProjectCategorySchema = t.Object({
+  ...ProjectCategoryPlain.properties,
+  category: CategoryPlain,
+});
+const ProjectProjectTypeSchema = t.Object({
+  ...ProjectProjectTypePlain.properties,
+  type: ProjectTypePlain,
+});
+
 export const CommonProjectFields = {
-  title: t.String(),
-  details: t.String(),
-  githubURL: t.String(),
-  presentationURL: t.String(),
-  documentURL: t.String(),
+  ...t.Pick(ProjectPlain, [
+    "title",
+    "details",
+    "githubURL",
+    "presentationURL",
+    "documentURL",
+    "youtubeURL",
+  ]).properties,
   figmaURL: t.Optional(t.String()),
-  youtubeURL: t.String(),
 };
 
-export const ProjectSchema = t.Intersect([
-  t.Object({
-    id: t.Number(),
-    ...CommonProjectFields,
-    ...FocalPointResponseFields,
-    thumbnailURL: t.String(),
-    thumbnailContentType: t.Optional(t.Nullable(t.String())),
-    assetsURL: t.Optional(t.String()),
-    imageID: t.Optional(t.Nullable(t.Number())),
-    imageMedia: t.Optional(t.Nullable(ImageMediaSchema)),
-    images: t.Optional(t.Array(t.Object({
-      sortOrder: t.Number(),
-      image: ImageMediaSchema,
-    }))),
-    techStacks: t.String(),
-    projectTags: t.Optional(t.Array(t.Object({ tag: t.Object({ id: t.Number(), name: t.String(), tageGroupsId: t.Number() }) }))),
-    projectFields: t.Optional(t.Array(t.Object({ field: t.Object({ id: t.Number(), name: t.String() }) }))),
-    projectCategories: t.Optional(t.Array(t.Object({ category: t.Object({ id: t.Number(), name: t.String() }) }))),
-    projectProjectTypes: t.Optional(t.Array(t.Object({ type: t.Object({ id: t.Number(), name: t.String() }) }))),
-    projectMembers: t.Optional(t.Array(t.Object({
-      user: UserSchema,
-      role: RoleSchema,
-    }))),
-    projectCourses: t.Optional(t.Array(t.Object({
-      course: CourseSchema,
-    }))),
-  }),
-  BaseModelSchema,
-]);
+export const ProjectSchema = t.Object({
+  ...t.Pick(ProjectPlain, ["id", "thumbnailURL", "techStacks"]).properties,
+  ...CommonProjectFields,
+  figmaURL: t.Optional(ProjectPlain.properties.figmaURL),
+  ...FocalPointResponseFields,
+  thumbnailContentType: t.Optional(t.Nullable(t.String())),
+  assetsURL: t.Optional(ProjectPlain.properties.assetsURL),
+  imageID: t.Optional(ProjectPlain.properties.imageID),
+  imageMedia: t.Optional(t.Nullable(ImageMediaSchema)),
+  images: t.Optional(
+    t.Array(
+      t.Object({
+        ...ProjectImagePlain.properties,
+        image: ImageMediaSchema,
+      }),
+    ),
+  ),
+  projectFields: t.Optional(t.Array(ProjectFieldSchema)),
+  projectCategories: t.Optional(t.Array(ProjectCategorySchema)),
+  projectProjectTypes: t.Optional(t.Array(ProjectProjectTypeSchema)),
+  projectMembers: t.Optional(
+    t.Array(
+      t.Object({
+        ...ProjectMemberPlain.properties,
+        user: UserSchema,
+        role: RoleSchema,
+      }),
+    ),
+  ),
+  projectCourses: t.Optional(
+    t.Array(
+      t.Object({
+        ...ProjectCoursePlain.properties,
+        course: CourseSchema,
+      }),
+    ),
+  ),
+  ...BaseModelSchema.properties,
+});
 
 const ProjectMemberFields = {
   userID: t.Numeric(),
   roleID: t.Numeric(),
 };
 
-export const CreateProjectDTO = t.Object({
-  thumbnailFile: t.File(),
-  ...CommonProjectFields,
-  ...FocalPointInputFields,
-  tagsID: t.Optional(t.Array(t.Number())),
-  fieldIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
-  categoryIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
-  projectTypeIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
-  members: t.Array(t.Object(ProjectMemberFields)),
-  coursesID: t.Array(t.Number()),
-  assets: t.Files(),
-  techStacks: t.Array(t.String()),
-});
-
-export const ProjectDTO = t.Intersect([
-  t.Object({
-    id: t.Number(),
-    thumbnailURL: t.String(),
-    thumbnailContentType: t.Optional(t.Nullable(t.String())),
+export const CreateProjectDTO = t.Object(
+  {
+    thumbnailFile: t.File(),
     ...CommonProjectFields,
-    ...FocalPointResponseFields,
-    assetsURL: t.Array(t.String()),
-    images: t.Optional(t.Array(ProjectImageDTO)),
+    ...FocalPointInputFields,
+    tagsID: t.Optional(t.Never()),
+    fieldIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
+    categoryIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
+    projectTypeIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
+    members: t.Array(t.Object(ProjectMemberFields)),
+    coursesID: t.Array(t.Number()),
+    assets: t.Files(),
     techStacks: t.Array(t.String()),
-    tag: t.Array(Tag),
-    fields: t.Array(t.Object({ id: t.Number(), name: t.String() })),
-    categories: t.Array(t.Object({ id: t.Number(), name: t.String() })),
-    projectTypes: t.Array(t.Object({ id: t.Number(), name: t.String() })),
+  },
+  { additionalProperties: false },
+);
 
-    member: t.Array(
-      t.Intersect([
-        UserSchema,
-        t.Object({
-          role: RoleSchema,
-        })
-      ])
-    ),
+export const ProjectDTO = t.Object({
+  ...t.Pick(ProjectPlain, ["id", "thumbnailURL"]).properties,
+  thumbnailContentType: t.Optional(t.Nullable(t.String())),
+  ...CommonProjectFields,
+  ...FocalPointResponseFields,
+  assetsURL: t.Array(t.String()),
+  images: t.Optional(t.Array(ProjectImageDTO)),
+  techStacks: t.Array(t.String()),
+  fields: t.Array(FieldPlain),
+  categories: t.Array(CategoryPlain),
+  projectTypes: t.Array(ProjectTypePlain),
 
-    course: t.Array(CourseDTOSchema),
-  })
-]);
+  member: t.Array(t.Object({ ...UserSchema.properties, role: RoleSchema })),
 
-export const ProjectQueryParams = t.Object({
-  tagID: t.Optional(t.Array(t.Numeric())),
-  fieldIds: t.Optional(t.Array(t.Numeric())),
-  categoryIds: t.Optional(t.Array(t.Numeric())),
-  projectTypeIds: t.Optional(t.Array(t.Numeric())),
-  courseID: t.Optional(t.Array(t.Numeric())),
-  ...CommonQueryParams,
-  search: t.Optional(t.String()),
-  searchBy: t.Optional(t.String()),
-})
-
-export const UpdateProjectDTO = t.Object({
-  thumbnailFile: t.Optional(t.File()),
-  ...Object.fromEntries(
-    Object.entries(CommonProjectFields).map(([key, value]) => [
-      key,
-      t.Optional(value),
-    ])
-  ),
-  ...FocalPointInputFields,
-  newtagsID: t.Optional(t.Array(t.Number())),
-  deletedtagsID: t.Optional(t.Array(t.Number())),
-  fieldIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
-  categoryIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
-  projectTypeIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
-  newMembers: t.Optional(t.Array(t.Object(ProjectMemberFields))),
-  deletedmembersID: t.Optional(t.Array(t.Numeric())),
-  newCoursesID: t.Optional(t.Array(t.Number())),
-  deletedCoursesID: t.Optional(t.Array(t.Number())),
-  assets: t.Optional(t.Files()),
-  techStacks: t.Optional(t.Array(t.String())),
+  course: t.Array(CourseDTOSchema),
 });
+
+export const ProjectQueryParams = t.Object(
+  {
+    fieldIds: t.Optional(t.Array(t.Numeric({ minimum: 1, multipleOf: 1 }))),
+    categoryIds: t.Optional(t.Array(t.Numeric({ minimum: 1, multipleOf: 1 }))),
+    projectTypeIds: t.Optional(
+      t.Array(t.Numeric({ minimum: 1, multipleOf: 1 })),
+    ),
+    courseID: t.Optional(t.Array(t.Numeric())),
+    ...CommonQueryParams,
+    search: t.Optional(t.String()),
+    searchBy: t.Optional(t.String()),
+  },
+  { additionalProperties: false },
+);
+
+export const UpdateProjectDTO = t.Object(
+  {
+    thumbnailFile: t.Optional(t.File()),
+    ...Object.fromEntries(
+      Object.entries(CommonProjectFields).map(([key, value]) => [
+        key,
+        t.Optional(value),
+      ]),
+    ),
+    ...FocalPointInputFields,
+    newtagsID: t.Optional(t.Never()),
+    deletedtagsID: t.Optional(t.Never()),
+    fieldIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
+    categoryIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
+    projectTypeIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
+    newMembers: t.Optional(t.Array(t.Object(ProjectMemberFields))),
+    deletedmembersID: t.Optional(t.Array(t.Numeric())),
+    newCoursesID: t.Optional(t.Array(t.Number())),
+    deletedCoursesID: t.Optional(t.Array(t.Number())),
+    assets: t.Optional(t.Files()),
+    techStacks: t.Optional(t.Array(t.String())),
+  },
+  { additionalProperties: false },
+);
 
 export const ProjectCreatePayloadSchema = t.Object({
-  title: t.String(),
-  details: t.String(),
-  githubURL: t.String(),
-  presentationURL: t.String(),
-  documentURL: t.String(),
+  ...t.Pick(ProjectPlain, [
+    "title",
+    "details",
+    "githubURL",
+    "presentationURL",
+    "documentURL",
+    "youtubeURL",
+    "thumbnailURL",
+    "assetsURL",
+  ]).properties,
   figmaURL: t.Optional(t.String()),
-  youtubeURL: t.String(),
-  thumbnailURL: t.String(),
-  assetsURL: t.String(),
   ...FocalPointInputFields,
   techStacks: t.String(),
-  tagsID: t.Optional(t.Array(t.Number())),
   fieldIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
   categoryIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
   projectTypeIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
 });
 
 export const ProjectUpdatePayloadSchema = t.Partial(
-  t.Object({
-    title: t.String(),
-    details: t.String(),
-    githubURL: t.String(),
-    presentationURL: t.String(),
-    documentURL: t.String(),
-    figmaURL: t.Optional(t.String()),
-    youtubeURL: t.String(),
-    thumbnailURL: t.String(),
-    assetsURL: t.String(),
-    ...FocalPointInputFields,
-    techStacks: t.String(),
-    newtagsID: t.Array(t.Number()),
-    deletedtagsID: t.Array(t.Number()),
-    fieldIds: t.Array(t.Integer({ minimum: 1 })),
-    categoryIds: t.Array(t.Integer({ minimum: 1 })),
-    projectTypeIds: t.Array(t.Integer({ minimum: 1 })),
-    updatedAt: t.Date(),
-  })
+  t.Object(
+    {
+      ...t.Pick(ProjectPlain, [
+        "title",
+        "details",
+        "githubURL",
+        "presentationURL",
+        "documentURL",
+        "youtubeURL",
+        "thumbnailURL",
+        "assetsURL",
+      ]).properties,
+      figmaURL: t.Optional(t.String()),
+      ...FocalPointInputFields,
+      techStacks: t.String(),
+      fieldIds: t.Array(t.Integer({ minimum: 1 })),
+      categoryIds: t.Array(t.Integer({ minimum: 1 })),
+      projectTypeIds: t.Array(t.Integer({ minimum: 1 })),
+      updatedAt: t.Date(),
+    },
+    { additionalProperties: false },
+  ),
 );
 
 export const ProjectMemberPayloadSchema = t.Object({
-  projectID: t.Number(),
-  userID: t.Number(),
-  roleID: t.Number(),
+  ...t.Pick(ProjectMemberPlain, ["projectID", "userID", "roleID"]).properties,
 });
 
 export const ProjectCoursePayloadSchema = t.Object({
-  projectID: t.Number(),
-  courseID: t.Number(),
+  ...t.Pick(ProjectCoursePlain, ["projectID", "courseID"]).properties,
 });
 
 export const ProjectIdParam = t.Object({
-  id: t.Number(),
+  ...t.Pick(ProjectPlain, ["id"]).properties,
 });
 
 export type Project = Static<typeof ProjectSchema>;

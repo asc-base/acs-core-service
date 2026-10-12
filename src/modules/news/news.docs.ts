@@ -2,10 +2,7 @@ import { t } from "elysia";
 import {
   CreateNewsDTO,
   NewsDTO,
-  NewsFeatureDTO,
   NewsQueryParams,
-  UpsertNewsFeatureDTO,
-  QueryNewsFeatureParams,
   NewsUpdateDTO,
   NewsWithAdditionalImageDTO,
 } from "./domain/news";
@@ -63,45 +60,6 @@ export const NewsDocs = {
       404: mapResponse(t.Null()),
     },
   },
-  upsertNewsFeature: {
-    detail: {
-      summary: "Upsert news feature",
-      description:
-        "Create or update a news feature with the provided information",
-      tags: ["News"],
-    },
-    body: UpsertNewsFeatureDTO,
-    response: {
-      200: mapResponse(NewsFeatureDTO),
-    },
-  },
-  getNewsFeatures: {
-    detail: {
-      summary: "Get news features",
-      description: "Retrieve a list of news features based on query parameters",
-      tags: ["News"],
-    },
-    query: QueryNewsFeatureParams,
-    response: {
-      200: mapResponse(Pageable(NewsFeatureDTO)),
-    },
-  },
-
-  getNewsFeatureById: {
-    detail: {
-      summary: "Get news feature by ID",
-      description: "Retrieve a news feature by its ID",
-      tags: ["News"],
-    },
-    params: t.Object({
-      id: t.Numeric(),
-    }),
-    response: {
-      200: mapResponse(NewsFeatureDTO),
-      404: mapResponse(t.Null()),
-    },
-  },
-
   deleteNews: {
     detail: {
       summary: "Delete news by ID.",

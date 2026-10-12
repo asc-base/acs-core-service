@@ -36,7 +36,6 @@ export class ProjectService implements IProjectService {
     const {
       thumbnailFile,
       assets,
-      tagsID,
       fieldIds,
       categoryIds,
       projectTypeIds,
@@ -88,7 +87,6 @@ export class ProjectService implements IProjectService {
         galleryMedia,
         assetsURL: assetsURLString,
         techStacks: techStackString,
-        tagsID,
         fieldIds,
         categoryIds,
         projectTypeIds,
@@ -154,8 +152,6 @@ export class ProjectService implements IProjectService {
     const {
       thumbnailFile,
       assets,
-      newtagsID = [],
-      deletedtagsID = [],
       fieldIds,
       categoryIds,
       projectTypeIds,
@@ -213,8 +209,6 @@ export class ProjectService implements IProjectService {
       ...(thumbnailMedia && { thumbnailMedia: { ...thumbnailMedia, fileName: thumbnailFile!.name, contentType: thumbnailContentType!, fileSize: thumbnailFile!.size } }),
       ...(galleryMedia.length && { galleryMedia }),
       techStacks: techStackString,
-      newtagsID,
-      deletedtagsID,
       ...(fieldIds !== undefined && { fieldIds }),
       ...(categoryIds !== undefined && { categoryIds }),
       ...(projectTypeIds !== undefined && { projectTypeIds }),

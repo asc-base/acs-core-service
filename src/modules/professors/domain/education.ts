@@ -1,20 +1,19 @@
 import { t, Static } from "elysia";
 import { BaseModelSchema } from "../../../core/models";
+import { EducationPlain } from "../../../generated/prismabox/Education";
 export const CommonEducationFields = {
-  education: t.String(),
+  ...t.Pick(EducationPlain, ["education"]).properties,
 };
 
-export const EducationSchema = t.Intersect([
-  t.Object({
-    id: t.Number(),
-    professorID: t.Number(),
-    ...CommonEducationFields,
-  }),
-  BaseModelSchema,
-]);
+export const EducationSchema = t.Object({
+  ...t.Pick(EducationPlain, ["id", "professorID"]).properties,
+  sequence: t.Optional(EducationPlain.properties.sequence),
+  ...CommonEducationFields,
+  ...BaseModelSchema.properties,
+});
 
 export const EducationDTO = t.Object({
-  id: t.Number(),
+  ...t.Pick(EducationPlain, ["id"]).properties,
   ...CommonEducationFields,
 });
 

@@ -5,6 +5,9 @@ import type { PrismaInstance } from "../../../src/lib/db";
 describe("ProjectRepository classification filters", () => {
   test("uses OR across classification groups for both rows and totals", async () => {
     const tx = {
+      field: { findMany: vi.fn().mockResolvedValue([{ id: 1 }]) },
+      category: { findMany: vi.fn().mockResolvedValue([{ id: 1 }]) },
+      projectType: { findMany: vi.fn().mockResolvedValue([{ id: 1 }]) },
       project: { findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(0) },
     };
     const repository = new ProjectRepository(tx as unknown as PrismaInstance);
@@ -30,29 +33,40 @@ describe("ProjectRepository classification filters", () => {
     expect(tx.project.count).toHaveBeenCalledWith({ where });
   });
 
-  test("maps legacy tag IDs to lookup IDs by group and name, with unmatched IDs as fallback", async () => {
+  test("keeps classifications when an update omits those groups", async () => {
     const tx = {
-      tag: { findMany: vi.fn().mockResolvedValue([
-        { id: 19, name: "Education", tageGroups: { name: "category" } },
-        { id: 200, name: "External", tageGroups: { name: "custom" } },
-      ]) },
       field: { findMany: vi.fn().mockResolvedValue([]) },
-      category: { findMany: vi.fn().mockResolvedValue([{ id: 1, name: "Education" }]) },
+      category: { findMany: vi.fn().mockResolvedValue([]) },
       projectType: { findMany: vi.fn().mockResolvedValue([]) },
-      project: { findMany: vi.fn().mockResolvedValue([]) },
+      projectField: { deleteMany: vi.fn(), createMany: vi.fn() },
+      projectCategory: { deleteMany: vi.fn(), createMany: vi.fn() },
+      projectProjectType: { deleteMany: vi.fn(), createMany: vi.fn() },
+      projectImage: { createMany: vi.fn() },
+      project: {
+        update: vi.fn(),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 7 }),
+      },
+    };
+    const db = { $transaction: (callback: (transaction: unknown) => unknown) => callback(tx) } as unknown as PrismaInstance;
+    const repository = new ProjectRepository(db);
+
+    await repository.updateProject(7, { title: "Updated" });
+
+    expect(tx.projectCategory.deleteMany).not.toHaveBeenCalled();
+    expect(tx.projectProjectType.deleteMany).not.toHaveBeenCalled();
+  });
+
+  test("rejects filter IDs that do not exist in their lookup table", async () => {
+    const tx = {
+      field: { findMany: vi.fn().mockResolvedValue([]) },
+      category: { findMany: vi.fn().mockResolvedValue([]) },
+      projectType: { findMany: vi.fn().mockResolvedValue([]) },
+      project: { findMany: vi.fn(), count: vi.fn() },
     };
     const repository = new ProjectRepository(tx as unknown as PrismaInstance);
 
-    await repository.getProject({ tagID: [19, 200] });
-
-    expect(tx.project.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: {
-        OR: [
-          { projectCategories: { some: { categoryID: { in: [1] } } } },
-          { projectTags: { some: { deletedAt: null, tagID: { in: [200] } } } },
-        ],
-        deletedAt: null,
-      },
-    }));
+    await expect(repository.getProject({ fieldIds: [999] })).rejects.toMatchObject({ statusCode: 400 });
+    expect(tx.project.findMany).not.toHaveBeenCalled();
+    expect(tx.project.count).not.toHaveBeenCalled();
   });
 });

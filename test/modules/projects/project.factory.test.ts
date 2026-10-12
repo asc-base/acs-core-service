@@ -3,7 +3,7 @@ import { ProjectFactory } from "../../../src/modules/projects/project.factory";
 import type { Project } from "../../../src/modules/projects/domain/project";
 
 describe("ProjectFactory", () => {
-  test("keeps legacy tags and maps the new project lookups into the DTO", () => {
+  test("maps the new project lookups into the DTO", () => {
     const factory = new ProjectFactory(
       { mapUserToDTO: vi.fn() } as never,
       { mapCourseListToDTO: vi.fn().mockReturnValue([]) } as never,
@@ -27,7 +27,6 @@ describe("ProjectFactory", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
-      projectTags: [{ tag: { id: 16, name: "Education", tageGroupsId: 3 } }],
       projectFields: [{ field: { id: 1, name: "Artificial intelligence" } }],
       projectCategories: [{ category: { id: 1, name: "Education" } }],
       projectProjectTypes: [{ type: { id: 1, name: "Research" } }],
@@ -37,7 +36,6 @@ describe("ProjectFactory", () => {
     } as unknown as Project;
 
     expect(factory.mapProjectToDTO(project)).toMatchObject({
-      tag: [{ id: 16, name: "Education", tagsGroupsId: 3 }],
       fields: [{ id: 1, name: "Artificial intelligence" }],
       categories: [{ id: 1, name: "Education" }],
       projectTypes: [{ id: 1, name: "Research" }],

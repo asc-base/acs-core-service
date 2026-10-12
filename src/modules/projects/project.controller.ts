@@ -73,7 +73,16 @@ export const ProjectController = (app: Elysia) =>
           set.status = HttpStatusCode.OK;
           return success(projectList, "Project retrieved successfully");
     },
-    ProjectDocs.getProject,
+    {
+      ...ProjectDocs.getProject,
+      beforeHandle({ request, set }) {
+        const params = new URL(request.url).searchParams;
+        if (["tagID", "tagId", "fields", "categories", "types"].some((key) => params.has(key))) {
+          set.status = HttpStatusCode.BAD_REQUEST;
+          return success(null, "Legacy project filters are no longer supported", HttpStatusCode.BAD_REQUEST);
+        }
+      },
+    },
   )
   .get(
         "/:id",

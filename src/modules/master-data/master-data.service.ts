@@ -7,17 +7,12 @@ interface IMasterDataService {
 export class MasterDataService implements IMasterDataService {
   constructor(private readonly masterDataRepository: IMasterDataRepository) {}
   async getMasterData(): Promise<MasterDataDTO> {
-    const [typeCourses, roles, tags, tagsGroups, prefixes, newsCategories, fields, categories, projectTypes] =
+    const [typeCourses, roles, prefixes, newsCategories, fields, categories, projectTypes] =
       await Promise.all([
         this.masterDataRepository.getTypeCourses(),
         this.masterDataRepository.getRoles(),
-        this.masterDataRepository.getTags(),
-        this.masterDataRepository.getTagGroup(),
         this.masterDataRepository.getPrefixes(),
         this.masterDataRepository.getNewsCategories(),
-        this.masterDataRepository.getFields(),
-        this.masterDataRepository.getCategories(),
-        this.masterDataRepository.getProjectTypes(),
         this.masterDataRepository.getFields(),
         this.masterDataRepository.getCategories(),
         this.masterDataRepository.getProjectTypes(),
@@ -26,8 +21,6 @@ export class MasterDataService implements IMasterDataService {
     return {
       typeCourses,
       roles,
-      tags,
-      tagsGroups,
       prefixes,
       newsCategories,
       fields,

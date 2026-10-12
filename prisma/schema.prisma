@@ -11,6 +11,16 @@ generator client {
   output        = "../src/generated/prisma"
 }
 
+generator prismabox {
+  provider                   = "prismabox"
+  output                     = "../src/generated/prismabox"
+  typeboxImportDependencyName = "elysia"
+  typeboxImportVariableName   = "t"
+  inputModel                  = false
+  useJsonTypes                = false
+  additionalProperties        = false
+}
+
 datasource db {
   provider = "postgresql"
   schemas  = ["public", "auth"]
@@ -168,28 +178,6 @@ model Verification {
   @@schema("auth")
 }
 
-model TageGroups {
-  id   Int    @id @default(autoincrement()) @map("id")
-  name String @unique @map("name")
-  tags Tag[]
-
-  @@map("tag_groups")
-  @@schema("public")
-}
-
-model Tag {
-  id           Int            @id @default(autoincrement()) @map("id")
-  name         String         @unique @map("name")
-  tageGroups   TageGroups?    @relation(fields: [tageGroupsId], references: [id])
-  tageGroupsId Int            @map("tage_groups_id")
-  news         News[]
-  newsFeatures NewsFeatures[]
-  projectTags  ProjectTag[]
-
-  @@map("tags")
-  @@schema("public")
-}
-
 model News {
   id           Int            @id @default(autoincrement()) @map("id")
   title        String         @map("title")
@@ -202,13 +190,10 @@ model News {
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at")
   deletedAt    DateTime?      @map("deleted_at")
-  tagID        Int            @map("tag_id")
-  tag          Tag            @relation(fields: [tagID], references: [id])
   newsCategoryID Int?          @map("news_category_id")
   newsCategory   NewsCategory? @relation(fields: [newsCategoryID], references: [id], onDelete: SetNull, onUpdate: Cascade)
   eventStartAt   DateTime?      @map("event_start_at")
   eventEndAt     DateTime?      @map("event_end_at")
-  newsFeatures NewsFeatures[]
   newsAdditionalImages NewsAdditionalImage[]
   newsImages   NewsImage[]
   newsBulletins NewsBulletin[]
@@ -516,24 +501,6 @@ view UserProfessorView {
   @@schema("public")
 }
 
-model NewsFeatures {
-  id           Int       @id @default(autoincrement()) @map("id")
-  thumbnailURL String    @map("thumbnail_url")
-  newsID       Int       @map("news_id")
-  tagID        Int       @map("tag_id")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  deletedAt    DateTime? @map("deleted_at")
-  news         News      @relation(fields: [newsID], references: [id])
-  tag          Tag       @relation(fields: [tagID], references: [id])
-  thumbnailFocalPointX Float? @map("thumbnail_focal_point_x")
-  thumbnailFocalPointY Float? @map("thumbnail_focal_point_y")
-
-  @@unique([newsID, tagID])
-  @@map("news_features")
-  @@schema("public")
-}
-
 model Project {
   id              Int             @id @default(autoincrement()) @map("id")
   title           String          @map("title")
@@ -552,7 +519,6 @@ model Project {
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
   deletedAt       DateTime?       @map("deleted_at")
-  projectTags     ProjectTag[]
   projectFields   ProjectField[]
   projectCategories ProjectCategory[]
   projectProjectTypes ProjectProjectType[]
@@ -579,22 +545,6 @@ model ProjectImage {
   @@unique([projectID, sortOrder])
   @@index([imageID])
   @@map("project_images")
-  @@schema("public")
-}
-
-model ProjectTag {
-  id        Int       @id @default(autoincrement()) @map("id")
-  projectID Int       @map("project_id")
-  tagID     Int       @map("tag_id")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
-
-  project Project @relation(fields: [projectID], references: [id])
-  tag     Tag     @relation(fields: [tagID], references: [id])
-
-  @@unique([projectID, tagID])
-  @@map("project_tags")
   @@schema("public")
 }
 

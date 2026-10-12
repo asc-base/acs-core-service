@@ -47,21 +47,6 @@ export const createNewsController =
                   checkRole: PERMISSION.ADMINPERSMISSION,
                 },
               )
-              .put(
-                "/news-features",
-                async ({ newsService, body, set }) => {
-                  const newsFeature = await newsService.upsertNewsFeature(body);
-                  set.status = HttpStatusCode.OK;
-                  return success(
-                    newsFeature,
-                    "News feature upserted successfully",
-                  );
-                },
-                {
-                  ...NewsDocs.upsertNewsFeature,
-                  checkRole: PERMISSION.ADMINPERSMISSION,
-                },
-              )
               .patch(
                 "/:id",
                 async ({ newsService, params, body }) => {
@@ -154,7 +139,24 @@ export const createNewsController =
               set.status = HttpStatusCode.OK;
               return success(newsList, "News retrieved successfully");
             },
-            NewsDocs.getNews,
+            {
+              ...NewsDocs.getNews,
+              beforeHandle({ request, set }) {
+                const params = new URL(request.url).searchParams;
+                if (params.has("tagID") || params.has("tagId")) {
+                  set.status = HttpStatusCode.BAD_REQUEST;
+                  return success(null, "Legacy tag filters are no longer supported", HttpStatusCode.BAD_REQUEST);
+                }
+              },
+            },
+          )
+          .get(
+            "/news-features",
+            ({ set }) => {
+              set.status = HttpStatusCode.NOT_FOUND;
+              return success(null, "News features endpoint has been retired", HttpStatusCode.NOT_FOUND);
+            },
+            { response: { 404: t.Any() } },
           )
           .get(
             "/:id",
@@ -166,43 +168,7 @@ export const createNewsController =
               }
               return success(news, "News retrieved successfully");
             },
-            NewsDocs.getNewsById,
-          )
-          .group("/news-features", (app) =>
-            app
-              .get(
-                "",
-                async ({ newsService, query, set }) => {
-                  const newsFeatures = await newsService.getNewsFeatures(query);
-                  set.status = HttpStatusCode.OK;
-                  return success(
-                    newsFeatures,
-                    "News features retrieved successfully",
-                  );
-                },
-                NewsDocs.getNewsFeatures,
-              )
-              .get(
-                "/:id",
-                async ({ newsService, params, set }) => {
-                  const newsFeature = await newsService.getNewsFeatureById(
-                    Number(params.id),
-                  );
-                  if (!newsFeature) {
-                    set.status = HttpStatusCode.NOT_FOUND;
-                    return success(
-                      null,
-                      "News feature not found",
-                      HttpStatusCode.NOT_FOUND,
-                    );
-                  }
-                  return success(
-                    newsFeature,
-                    "News feature retrieved successfully",
-                  );
-                },
-                NewsDocs.getNewsFeatureById,
-              ),
+            { ...NewsDocs.getNewsById, params: t.Object({ id: t.Numeric() }) },
           ),
       );
 
