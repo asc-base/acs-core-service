@@ -255,11 +255,10 @@ Table public.news {
   title text [not null]
   detail text [not null]
 
-  // Legacy fields retained until the news/media migration is complete.
+  // Legacy media fields are retained until the news/media migration is complete.
   thumbnail text
   thumbnail_focal_point_x float
   thumbnail_focal_point_y float
-  tag_id int [not null, ref: > public.tags.id]
   start_date timestamp [not null]
   due_date timestamp
 
@@ -627,34 +626,6 @@ Table public.project_images {
 }
 
 
-// Existing tables retained until their replacement data and callers are migrated.
-Table public.tag_groups {
-  id int [pk, not null]
-  name text [not null, unique]
-}
-
-Table public.tags {
-  id int [pk, not null]
-  name text [not null, unique]
-  tage_groups_id int [ref: > public.tag_groups.id, not null]
-}
-
-Table public.news_features {
-  id int [pk, not null]
-  thumbnail_url text [not null]
-  news_id int [ref: > public.news.id, not null]
-  tag_id int [ref: > public.tags.id, not null]
-  created_at timestamp [not null]
-  updated_at timestamp [not null]
-  deleted_at timestamp
-  thumbnail_focal_point_x float
-  thumbnail_focal_point_y float
-
-  indexes {
-    (news_id, tag_id) [unique]
-  }
-}
-
 Table public.news_additional_images {
   id int [pk, not null]
   news_id int [ref: > public.news.id, not null]
@@ -680,19 +651,6 @@ Table public.pre_courses {
 
   indexes {
     (course_id, pre_course_id) [unique]
-  }
-}
-
-Table public.project_tags {
-  id int [pk, not null]
-  project_id int [ref: > public.projects.id, not null]
-  tag_id int [ref: > public.tags.id, not null]
-  created_at timestamp [not null]
-  updated_at timestamp [not null]
-  deleted_at timestamp
-
-  indexes {
-    (project_id, tag_id) [unique]
   }
 }
 

@@ -6,7 +6,6 @@ import {
   UpdateProjectDTO,
   ProjectCreatePayload,
   ProjectUpdatePayload,
-  ProjectTagPayload,
   ProjectMemberPayload,
   ProjectCoursePayload,
 } from "./domain/project";
@@ -37,7 +36,9 @@ export class ProjectService implements IProjectService {
     const {
       thumbnailFile,
       assets,
-      tagsID,
+      fieldIds,
+      categoryIds,
+      projectTypeIds,
       techStacks,
       members,
       coursesID,
@@ -86,15 +87,13 @@ export class ProjectService implements IProjectService {
         galleryMedia,
         assetsURL: assetsURLString,
         techStacks: techStackString,
+        fieldIds,
+        categoryIds,
+        projectTypeIds,
       };
 
       const createdProject = await this.projectRepository.createProject(createPayload);
       projectCreated = true;
-
-    const projectTagsData: ProjectTagPayload[] = Array.from(new Set(tagsID)).map((tagID) => ({
-      projectID: createdProject.id,
-      tagID,
-    }));
 
     const projectMembersData: ProjectMemberPayload[] = members.map((member) => ({
       projectID: createdProject.id,
@@ -109,11 +108,11 @@ export class ProjectService implements IProjectService {
 
       await this.projectRepository.createProjectMember(projectMembersData);
 
-      await this.projectRepository.createProjectTag(projectTagsData);
-
       await this.projectRepository.createProjectCourse(projectCourseData);
 
-      return this.projectFactory.mapProjectToDTO(createdProject);
+      const completeProject = await this.projectRepository.getProjectById(createdProject.id);
+      if (!completeProject) throw new AppError(ErrorCode.NOT_FOUND_ERROR, "Project not found", 404);
+      return this.projectFactory.mapProjectToDTO(completeProject);
     } catch (error) {
       if (!projectCreated) await Promise.all(uploadedMedia.map((media) => this.storageService.delete(media.bucket, media.fileKey).catch(() => {})));
       throw error;
@@ -153,8 +152,9 @@ export class ProjectService implements IProjectService {
     const {
       thumbnailFile,
       assets,
-      newtagsID = [],
-      deletedtagsID = [],
+      fieldIds,
+      categoryIds,
+      projectTypeIds,
       techStacks,
       newMembers = [],
       deletedmembersID = [],
@@ -169,7 +169,6 @@ export class ProjectService implements IProjectService {
 
     const uploadedMedia: StoredImage[] = [];
     let mediaCommitted = false;
-    let updatedProject: Awaited<ReturnType<IProjectRepository["updateProject"]>>;
     try {
     let thumbnailURL = existingProject.imageMedia?.imageUrl ?? existingProject.thumbnailURL;
     let thumbnailMedia: StoredImage | undefined;
@@ -210,25 +209,16 @@ export class ProjectService implements IProjectService {
       ...(thumbnailMedia && { thumbnailMedia: { ...thumbnailMedia, fileName: thumbnailFile!.name, contentType: thumbnailContentType!, fileSize: thumbnailFile!.size } }),
       ...(galleryMedia.length && { galleryMedia }),
       techStacks: techStackString,
+      ...(fieldIds !== undefined && { fieldIds }),
+      ...(categoryIds !== undefined && { categoryIds }),
+      ...(projectTypeIds !== undefined && { projectTypeIds }),
       updatedAt: new Date(),
     }
-      updatedProject = await this.projectRepository.updateProject(id, updatedData);
+      await this.projectRepository.updateProject(id, updatedData);
       mediaCommitted = true;
     } catch (error) {
       if (!mediaCommitted) await Promise.all(uploadedMedia.map((media) => this.storageService.delete(media.bucket, media.fileKey).catch(() => {})));
       throw error;
-    }
-
-    if (newtagsID.length > 0) {
-      const data = Array.from(new Set(newtagsID)).map((tagID) => ({
-        projectID: id,
-        tagID,
-      }));
-      await this.projectRepository.createProjectTag(data);
-    }
-
-    if (deletedtagsID.length > 0) {
-      await this.projectRepository.deleteProjectTag(id, deletedtagsID);
     }
 
     if (newMembers.length > 0) {
@@ -256,7 +246,9 @@ export class ProjectService implements IProjectService {
       await this.projectRepository.deleteProjectCourse(id, deletedCoursesID);
     }
 
-    return this.projectFactory.mapProjectToDTO(updatedProject);
+    const completeProject = await this.projectRepository.getProjectById(id);
+    if (!completeProject) throw new AppError(ErrorCode.NOT_FOUND_ERROR, "Project not found", 404);
+    return this.projectFactory.mapProjectToDTO(completeProject);
   }
 
   async deleteProject(id: number): Promise<ProjectDTO | null> {

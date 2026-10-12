@@ -2,12 +2,9 @@ import { Prisma } from "../generated/prisma/client";
 import { INewsRepository } from "../modules/news/domain/news.repository";
 import {
   News,
-  NewsFeature,
   NewsQueryParams,
-  QueryNewsFeatureParams,
   NewsCreatePayload,
   NewsUpdatePayload,
-  NewsFeatureUpsertPayload,
   NewsWithAdditionalImages,
   NewsBulletinType,
   NewsBulletinView,
@@ -16,57 +13,23 @@ import { AppError } from "../core/error/app-error";
 import { ErrorCode } from "../core/types/errors";
 import { calculatePagination } from "../core/utils/calculator";
 import { PrismaInstance } from "../lib/db";
-async function resolveNewsLinks(
-  tx: Prisma.TransactionClient,
-  newsCategoryID?: number,
-  legacyTagID?: number,
-) {
-  const category = newsCategoryID === undefined
-    ? undefined
-    : await tx.newsCategory.findUnique({ where: { id: newsCategoryID } });
-  if (newsCategoryID !== undefined && !category) {
-    throw new AppError(ErrorCode.VALIDATION_ERROR, "News category does not exist", 400);
-  }
 
-  let tag = legacyTagID === undefined
-    ? undefined
-    : await tx.tag.findUnique({ where: { id: legacyTagID }, include: { tageGroups: true } });
-  if (legacyTagID !== undefined && tag?.tageGroups?.name !== "news") {
-    throw new AppError(ErrorCode.VALIDATION_ERROR, "tagID must refer to a news tag", 400);
-  }
-  if (category && tag && category.name !== tag.name) {
-    throw new AppError(ErrorCode.VALIDATION_ERROR, "tagID and newsCategoryId must refer to the same news category", 400);
-  }
-  if (category && !tag) {
-    tag = await tx.tag.findFirst({ where: { name: category.name, tageGroups: { name: "news" } }, include: { tageGroups: true } }) ?? undefined;
-  }
-  if (!tag) throw new AppError(ErrorCode.VALIDATION_ERROR, "A news category is required", 400);
-
-  const resolvedCategory = category ?? await tx.newsCategory.findFirst({ where: { name: tag.name }, orderBy: { id: "asc" } });
-  return { tagID: tag.id, newsCategoryID: resolvedCategory?.id };
-}
+const newsImages = { where: { deletedAt: null }, include: { image: true }, orderBy: { sortOrder: "asc" as const } };
 
 export class NewsRepository implements INewsRepository {
   constructor(private readonly db: PrismaInstance) { }
 
-  private async getNewsFilter(query: NewsQueryParams): Promise<Prisma.NewsWhereInput> {
-    if (query.newsCategoryId !== undefined) return { newsCategoryID: query.newsCategoryId };
-    if (query.tagID === undefined) return {};
-    const tag = await this.db.tag.findUnique({ where: { id: query.tagID }, include: { tageGroups: true } });
-    if (tag?.tageGroups?.name === "news") {
-      const category = await this.db.newsCategory.findFirst({ where: { name: tag.name }, orderBy: { id: "asc" }, select: { id: true } });
-      if (category) return { newsCategoryID: category.id };
-    }
-    return { tagID: query.tagID };
+  private async newsWhere(query: NewsQueryParams): Promise<Prisma.NewsWhereInput> {
+    if (query.newsCategoryId === undefined) return { deletedAt: null };
+    const category = await this.db.newsCategory.findUnique({ where: { id: query.newsCategoryId }, select: { id: true } });
+    if (!category) throw new AppError(ErrorCode.VALIDATION_ERROR, "News category does not exist", 400);
+    return { newsCategoryID: category.id, deletedAt: null };
   }
 
   async getNewsBulletins(type: NewsBulletinType): Promise<NewsBulletinView[]> {
     const rows = await this.db.newsBulletin.findMany({
       where: { type, deletedAt: null, news: { deletedAt: null } },
-      include: { news: { include: {
-        tag: true, newsCategory: true,
-        newsImages: { where: { deletedAt: null }, include: { image: true }, orderBy: { sortOrder: "asc" } },
-      } } },
+      include: { news: { include: { newsCategory: true, newsImages } } },
       orderBy: { id: "asc" },
     });
     return rows.map(({ news, ...bulletin }) => ({
@@ -75,7 +38,6 @@ export class NewsRepository implements INewsRepository {
         ...news,
         category: news.newsCategory,
         images: news.newsImages.map(({ image, ...row }) => ({ ...row, imageUrl: image.imageUrl })),
-        tag: news.tag ? { ...news.tag, tagsGroupsId: news.tag.tageGroupsId } : undefined,
       },
     }));
   }
@@ -84,196 +46,82 @@ export class NewsRepository implements INewsRepository {
     return this.db.$transaction(async (tx) => {
       const news = await tx.news.findFirst({ where: { id: newsID, deletedAt: null }, select: { id: true } });
       if (!news) throw new AppError(ErrorCode.NOT_FOUND_ERROR, "News not found", 404);
-      const tagName = type === "HIGHLIGHT" ? "newshighlight" : "announcement";
-      const tag = await tx.tag.findFirst({ where: { name: tagName, tageGroups: { name: "news-feature" } } });
       if (enabled) {
         const imageType = type === "HIGHLIGHT" ? "THUMBNAIL" as const : "CARD" as const;
-        const image = await tx.newsImage.findFirst({ where: { newsID, imageType, deletedAt: null }, include: { image: true } });
+        const image = await tx.newsImage.findFirst({ where: { newsID, imageType, deletedAt: null } });
         if (!image) throw new AppError(ErrorCode.VALIDATION_ERROR, `${imageType} image is required for this bulletin`, 400);
-        const bulletin = await tx.newsBulletin.upsert({
+        await tx.newsBulletin.upsert({
           where: { newsID_type: { newsID, type } },
           create: { newsID, type },
           update: { deletedAt: null },
         });
-        if (tag) await tx.newsFeatures.upsert({
-          where: { newsID_tagID: { newsID, tagID: tag.id } },
-          create: { newsID, tagID: tag.id, thumbnailURL: image.image.imageUrl, thumbnailFocalPointX: image.focalPointX, thumbnailFocalPointY: image.focalPointY },
-          update: { thumbnailURL: image.image.imageUrl, thumbnailFocalPointX: image.focalPointX, thumbnailFocalPointY: image.focalPointY, deletedAt: null },
-        });
-        const row = await tx.newsBulletin.findUniqueOrThrow({
-          where: { id: bulletin.id },
-          include: {
-            news: {
-              include: {
-                tag: true,
-                newsCategory: true,
-                newsImages: {
-                  where: { deletedAt: null },
-                  include: { image: true },
-                  orderBy: { sortOrder: "asc" },
-                },
-              },
-            },
-          },
-        });
-        return { ...row, news: { ...row.news, category: row.news.newsCategory, images: row.news.newsImages.map(({ image, ...link }) => ({ ...link, imageUrl: image.imageUrl })), tag: row.news.tag ? { ...row.news.tag, tagsGroupsId: row.news.tag.tageGroupsId } : undefined } };
+      } else {
+        const result = await tx.newsBulletin.updateMany({ where: { newsID, type, deletedAt: null }, data: { deletedAt: new Date() } });
+        if (!result.count) return null;
       }
-
-      const result = await tx.newsBulletin.updateMany({ where: { newsID, type, deletedAt: null }, data: { deletedAt: new Date() } });
-      if (tag) await tx.newsFeatures.updateMany({ where: { newsID, tagID: tag.id, deletedAt: null }, data: { deletedAt: new Date() } });
-      if (!result.count) return null;
-      const row = await tx.newsBulletin.findUniqueOrThrow({
+      const bulletin = await tx.newsBulletin.findUniqueOrThrow({
         where: { newsID_type: { newsID, type } },
-        include: {
-          news: {
-            include: {
-              tag: true,
-              newsCategory: true,
-              newsImages: {
-                where: { deletedAt: null },
-                include: { image: true },
-                orderBy: { sortOrder: "asc" },
-              },
-            },
-          },
-        },
+        include: { news: { include: { newsCategory: true, newsImages } } },
       });
-      return { ...row, news: { ...row.news, category: row.news.newsCategory, images: row.news.newsImages.map(({ image, ...link }) => ({ ...link, imageUrl: image.imageUrl })), tag: row.news.tag ? { ...row.news.tag, tagsGroupsId: row.news.tag.tageGroupsId } : undefined } };
-    });
-  }
-
-  private async syncFeatureMedia(tx: Prisma.TransactionClient, data: NewsFeatureUpsertPayload) {
-    const tag = await tx.tag.findUnique({ where: { id: data.tagID }, include: { tageGroups: true } });
-    if (tag?.tageGroups?.name !== "news-feature") return;
-    const type = tag.name.toLowerCase() === "announcement"
-      ? "ANNOUNCEMENT" as const
-      : tag.name.toLowerCase() === "newshighlight"
-        ? "HIGHLIGHT" as const
-        : null;
-    if (!type) return;
-    const imageType = type === "ANNOUNCEMENT" ? "CARD" as const : "THUMBNAIL" as const;
-    const mediaData = data.media ?? { provider: "legacy_url", imageUrl: data.thumbnailURL };
-    const media = await tx.imageMedia.upsert({
-      where: { imageUrl: data.thumbnailURL },
-      create: mediaData,
-      update: {},
-    });
-    const active = await tx.newsImage.findFirst({ where: { newsID: data.newsID, imageType, deletedAt: null } });
-    if (active && active.imageID !== media.id) {
-      await tx.newsImage.update({ where: { id: active.id }, data: { deletedAt: new Date() } });
-    }
-    const key = { newsID_imageID_imageType: { newsID: data.newsID, imageID: media.id, imageType } };
-    const existing = await tx.newsImage.findUnique({ where: key });
-    if (existing) {
-      await tx.newsImage.update({ where: { id: existing.id }, data: {
-        deletedAt: null,
-        focalPointX: data.thumbnailFocalPointX,
-        focalPointY: data.thumbnailFocalPointY,
-      } });
-    } else {
-      await tx.newsImage.create({ data: {
-        newsID: data.newsID, imageID: media.id, imageType,
-        focalPointX: data.thumbnailFocalPointX, focalPointY: data.thumbnailFocalPointY,
-      } });
-    }
-    await tx.newsBulletin.upsert({
-      where: { newsID_type: { newsID: data.newsID, type } },
-      create: { newsID: data.newsID, type },
-      update: { deletedAt: null },
+      return {
+        ...bulletin,
+        news: {
+          ...bulletin.news,
+          category: bulletin.news.newsCategory,
+          images: bulletin.news.newsImages.map(({ image, ...row }) => ({ ...row, imageUrl: image.imageUrl })),
+        },
+      };
     });
   }
 
   async createNews(data: NewsCreatePayload): Promise<NewsWithAdditionalImages> {
-    const { images = [], additionalImageUrls = [], newsCategoryID, tagID, ...fields } = data;
+    const { images = [], additionalImageUrls = [], newsCategoryID, ...fields } = data;
     return this.db.$transaction(async (tx) => {
-    const links = await resolveNewsLinks(tx, newsCategoryID, tagID);
-    const news = await tx.news.create({
-      data: {
-        ...fields,
-        tag: { connect: { id: links.tagID } },
-        ...(links.newsCategoryID !== undefined ? { newsCategory: { connect: { id: links.newsCategoryID } } } : {}),
-        ...(images.length ? {
-          newsImages: {
-            create: images.map(({ media, ...image }) => ({
-              ...image,
-              image: {
-                connectOrCreate: {
-                  where: { imageUrl: media.imageUrl },
-                  create: media,
-                },
-              },
-            })),
-          },
-        } : {}),
-        ...(additionalImageUrls.length ? {
-          newsAdditionalImages: {
-            create: additionalImageUrls.map((imageUrl) => ({ imageUrl })),
-          },
-        } : {}),
-      },
-      include: {
-        tag: true,
-        newsCategory: true,
-        newsImages: { where: { deletedAt: null }, include: { image: true }, orderBy: { sortOrder: "asc" } },
-        newsAdditionalImages: { where: { deletedAt: null } },
-      },
-    });
-    return {
-      ...news,
-      category: news.newsCategory,
-      images: news.newsImages.map(({ image, ...row }) => ({ ...row, imageUrl: image.imageUrl })),
-      tag: news.tag
-        ? {
-          ...news.tag,
-          tagsGroupsId: news.tag.tageGroupsId,
-          // Remove the incorrect property if present
-          // Optionally: ...news.tag without 'tageGroupsId'
-        }
-        : undefined,
-    };
+      const category = await tx.newsCategory.findUnique({ where: { id: newsCategoryID } });
+      if (!category) throw new AppError(ErrorCode.VALIDATION_ERROR, "News category does not exist", 400);
+      const news = await tx.news.create({
+        data: {
+          ...fields,
+          newsCategory: { connect: { id: newsCategoryID } },
+          ...(images.length ? {
+            newsImages: {
+              create: images.map(({ media, ...image }) => ({
+                ...image,
+                image: { connectOrCreate: { where: { imageUrl: media.imageUrl }, create: media } },
+              })),
+            },
+          } : {}),
+          ...(additionalImageUrls.length ? {
+            newsAdditionalImages: { create: additionalImageUrls.map((imageUrl) => ({ imageUrl })) },
+          } : {}),
+        },
+        include: { newsCategory: true, newsImages, newsAdditionalImages: { where: { deletedAt: null } } },
+      });
+      return {
+        ...news,
+        category: news.newsCategory,
+        images: news.newsImages.map(({ image, ...row }) => ({ ...row, imageUrl: image.imageUrl })),
+      };
     });
   }
 
   async getNews(query: NewsQueryParams): Promise<News[]> {
-    const {
-      page = 1,
-      pageSize = 10,
-      orderBy = "createdAt",
-      sortBy,
-      search,
-      searchBy,
-    } = query;
-    const newsFilter = await this.getNewsFilter(query);
+    const { page = 1, pageSize = 10, orderBy = "createdAt", sortBy, search, searchBy } = query;
+    const newsWhere = await this.newsWhere(query);
     const newsList = await this.db.news.findMany({
       skip: calculatePagination(page, pageSize),
       take: pageSize,
-      orderBy: {
-        [orderBy]: sortBy,
-      },
+      orderBy: { [orderBy]: sortBy },
       where: {
-        ...newsFilter,
-        ...(search &&
-          searchBy && {
-          [searchBy]: { contains: search, mode: "insensitive" },
-        }),
-        deletedAt: null,
+        ...newsWhere,
+        ...(search && searchBy ? { [searchBy]: { contains: search, mode: "insensitive" as const } } : {}),
       },
-      include: {
-        tag: true,
-        newsCategory: true,
-        newsImages: { where: { deletedAt: null }, include: { image: true }, orderBy: { sortOrder: "asc" } },
-      },
+      include: { newsCategory: true, newsImages },
     });
     return newsList.map((news) => ({
       ...news,
       category: news.newsCategory,
       images: news.newsImages.map(({ image, ...row }) => ({ ...row, imageUrl: image.imageUrl })),
-      tag: news.tag
-        ? {
-          ...news.tag,
-          tagsGroupsId: news.tag.tageGroupsId,
-        }
-        : undefined,
     }));
   }
 
@@ -282,262 +130,70 @@ export class NewsRepository implements INewsRepository {
       const news = await this.db.news.findUnique({
         where: { id, deletedAt: null },
         include: {
-          tag: true,
           newsCategory: true,
-          newsImages: { where: { deletedAt: null }, include: { image: true }, orderBy: { sortOrder: "asc" } },
-          newsAdditionalImages: {
-            where: { newsID: id , deletedAt: null },
-          },
-        }
+          newsImages,
+          newsAdditionalImages: { where: { newsID: id, deletedAt: null } },
+        },
       });
       if (!news) return null;
       return {
         ...news,
         category: news.newsCategory,
         images: news.newsImages.map(({ image, ...row }) => ({ ...row, imageUrl: image.imageUrl })),
-        tag: news.tag
-          ? {
-            ...news.tag,
-            tagsGroupsId: news.tag.tageGroupsId,
-          }
-          : undefined,
       };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === "P2025") {
-          throw new AppError(ErrorCode.NOT_FOUND_ERROR, "News not found", 404);
-        }
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        throw new AppError(ErrorCode.NOT_FOUND_ERROR, "News not found", 404);
       }
-      throw new AppError(
-        ErrorCode.DATABASE_ERROR,
-        "Database error occurred",
-        500,
-      );
-    }
-  }
-
-  async createNewsFeature(
-    newsFeatureData: NewsFeatureUpsertPayload,
-  ): Promise<NewsFeature> {
-    const data: Prisma.NewsFeaturesUncheckedCreateInput = {
-      newsID: newsFeatureData.newsID,
-      tagID: newsFeatureData.tagID,
-      thumbnailURL: newsFeatureData.thumbnailURL,
-      thumbnailFocalPointX : newsFeatureData.thumbnailFocalPointX,
-      thumbnailFocalPointY : newsFeatureData.thumbnailFocalPointY,
-    };
-
-    const newsFeature = await this.db.$transaction(async (tx) => {
-      const created = await tx.newsFeatures.create({
-        data,
-        include: { news: { include: { tag: true } } },
-      });
-      await this.syncFeatureMedia(tx, newsFeatureData);
-      return created;
-    });
-
-    return {
-      ...newsFeature,
-      news: {
-        ...newsFeature.news,
-        tag: newsFeature.news.tag
-          ? {
-            ...newsFeature.news.tag,
-            tagsGroupsId: newsFeature.news.tag.tageGroupsId,
-          }
-          : undefined,
-      },
-    };
-  }
-
-  async updateNewsFeature(
-    id: number,
-    newsFeatureData: NewsFeatureUpsertPayload,
-  ): Promise<NewsFeature> {
-    const data: Prisma.NewsFeaturesUncheckedUpdateInput = {
-      newsID: newsFeatureData.newsID,
-      tagID: newsFeatureData.tagID,
-      thumbnailURL: newsFeatureData.thumbnailURL,
-      thumbnailFocalPointX : newsFeatureData.thumbnailFocalPointX,
-      thumbnailFocalPointY : newsFeatureData.thumbnailFocalPointY,
-    };
-
-    const newsFeature = await this.db.$transaction(async (tx) => {
-      const updated = await tx.newsFeatures.update({
-        where: { id },
-        data,
-        include: { news: { include: { tag: true } } },
-      });
-      await this.syncFeatureMedia(tx, newsFeatureData);
-      return updated;
-    });
-
-    return {
-      ...newsFeature,
-      news: {
-        ...newsFeature.news,
-        tag: newsFeature.news.tag
-          ? {
-            ...newsFeature.news.tag,
-            tagsGroupsId: newsFeature.news.tag.tageGroupsId,
-          }
-          : undefined,
-      },
-    };
-  }
-
-  async getNewsFeaturesBy(
-    query: QueryNewsFeatureParams,
-  ): Promise<NewsFeature[]> {
-    const newsFeatures = await this.db.newsFeatures.findMany({
-      where: {
-        ...(query.tagID && { tagID: query.tagID }),
-        news: { deletedAt: null },
-        deletedAt: null,
-      },
-      include: {
-        news: {
-          include: {
-            tag: true,
-          },
-        },
-      },
-      orderBy: {
-        id: "asc",
-      },
-    });
-    return newsFeatures.map((newsFeature) => ({
-      ...newsFeature,
-      news: {
-        ...newsFeature.news,
-        tag: newsFeature.news.tag
-          ? {
-            ...newsFeature.news.tag,
-            tagsGroupsId: newsFeature.news.tag.tageGroupsId,
-          }
-          : undefined,
-      },
-    }));
-  }
-
-  async getNewsFeatureById(id: number): Promise<NewsFeature | null> {
-    try {
-      const newsFeature = await this.db.newsFeatures.findUnique({
-      where: { id, deletedAt: null, news: { deletedAt: null } },
-        include: {
-          news: {
-            include: {
-              tag: true,
-            },
-          },
-        },
-      });
-      if (!newsFeature) {
-        return null;
-      }
-      return {
-        ...newsFeature,
-        news: {
-          ...newsFeature.news,
-          tag: newsFeature.news.tag
-            ? {
-              ...newsFeature.news.tag,
-              tagsGroupsId: newsFeature.news.tag.tageGroupsId,
-            }
-            : undefined,
-        },
-      };
-    } catch (error) {
-      console.error("🔥 Error in getNewsFeatureById:", error);
-      return null;
+      throw new AppError(ErrorCode.DATABASE_ERROR, "Database error occurred", 500);
     }
   }
 
   async countNews(query: NewsQueryParams): Promise<number> {
-    const newsFilter = await this.getNewsFilter(query);
-    const count = await this.db.news.count({
+    const newsWhere = await this.newsWhere(query);
+    return this.db.news.count({
       where: {
-        ...newsFilter,
-        ...(query.search && query.searchBy && { [query.searchBy]: { contains: query.search, mode: "insensitive" } }),
-        deletedAt: null,
+        ...newsWhere,
+        ...(query.search && query.searchBy ? { [query.searchBy]: { contains: query.search, mode: "insensitive" as const } } : {}),
       },
     });
-    return count;
-  }
-
-  async countNewsFeatures(query: QueryNewsFeatureParams): Promise<number> {
-    const count = await this.db.newsFeatures.count({
-      where: {
-        ...(query.tagID && { tagID: query.tagID }),
-        news: { deletedAt: null },
-        deletedAt: null,
-      },
-    });
-    return count;
   }
 
   async deleteNews(id: number): Promise<News | null> {
     try {
-      const news = await this.db.$transaction(async (tx) => {
-        const row = await tx.news.update({ where: { id, deletedAt: null }, data: { deletedAt: new Date() }, include: { tag: true } });
+      return await this.db.$transaction(async (tx) => {
         const now = new Date();
+        const row = await tx.news.update({ where: { id, deletedAt: null }, data: { deletedAt: now }, include: { newsCategory: true } });
         await Promise.all([
           tx.newsImage.updateMany({ where: { newsID: id, deletedAt: null }, data: { deletedAt: now } }),
           tx.newsBulletin.updateMany({ where: { newsID: id, deletedAt: null }, data: { deletedAt: now } }),
-          tx.newsFeatures.updateMany({ where: { newsID: id, deletedAt: null }, data: { deletedAt: now } }),
           tx.newsAdditionalImage.updateMany({ where: { newsID: id, deletedAt: null }, data: { deletedAt: now } }),
         ]);
-        return row;
+        return { ...row, category: row.newsCategory };
       });
-      return {
-        ...news,
-        tag: news.tag
-          ? {
-            ...news.tag,
-            tagsGroupsId: news.tag.tageGroupsId,
-          }
-          : undefined,
-      };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === "P2025") {
-          return null;
-        }
-      }
-      throw new AppError(
-        ErrorCode.DATABASE_ERROR,
-        "Database error occurred",
-        500,
-      );
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+      throw new AppError(ErrorCode.DATABASE_ERROR, "Database error occurred", 500);
     }
   }
 
-  async updateNews(
-    newsID: number,
-    data: NewsUpdatePayload
-  ): Promise<NewsWithAdditionalImages> {
+  async updateNews(newsID: number, data: NewsUpdatePayload): Promise<NewsWithAdditionalImages> {
     const {
-      tagID, newsCategoryID, images = [], additionalImageUrls = [],
-      deletedImageIds = [], deletedAdditionalImagesId = [], detailImageOrder,
-      cardFocalPointX, cardFocalPointY, thumbnailImageFocalPointX, thumbnailImageFocalPointY,
-      ...newsData
+      newsCategoryID, images = [], additionalImageUrls = [], deletedImageIds = [],
+      deletedAdditionalImagesId = [], detailImageOrder, cardFocalPointX, cardFocalPointY,
+      thumbnailImageFocalPointX, thumbnailImageFocalPointY, ...newsData
     } = data;
     return this.db.$transaction(async (tx) => {
       const now = new Date();
-      const imageRows: Array<{ id: number; imageType: string; imageUrl: string }> = [];
-      const links = newsCategoryID !== undefined || tagID !== undefined
-        ? await resolveNewsLinks(tx, newsCategoryID, tagID)
-        : undefined;
+      const imageRows: Array<{ id: number; imageType: string }> = [];
+      if (newsCategoryID !== undefined && !(await tx.newsCategory.findUnique({ where: { id: newsCategoryID }, select: { id: true } }))) {
+        throw new AppError(ErrorCode.VALIDATION_ERROR, "News category does not exist", 400);
+      }
       const news = await tx.news.update({
         where: { id: newsID, deletedAt: null },
         data: {
           ...newsData,
-          ...(links ? { tag: { connect: { id: links.tagID } } } : {}),
-          ...(links
-            ? links.newsCategoryID !== undefined
-              ? { newsCategory: { connect: { id: links.newsCategoryID } } }
-              : { newsCategory: { disconnect: true } }
-            : {}),
+          ...(newsCategoryID !== undefined ? { newsCategory: { connect: { id: newsCategoryID } } } : {}),
         },
       });
       if (cardFocalPointX !== undefined || cardFocalPointY !== undefined) {
@@ -554,11 +210,7 @@ export class NewsRepository implements INewsRepository {
       }
 
       for (const image of images) {
-        const media = await tx.imageMedia.upsert({
-          where: { imageUrl: image.media.imageUrl },
-          create: image.media,
-          update: {},
-        });
+        const media = await tx.imageMedia.upsert({ where: { imageUrl: image.media.imageUrl }, create: image.media, update: {} });
         if (image.imageType !== "DETAIL") {
           await tx.newsImage.updateMany({
             where: { newsID, imageType: image.imageType, imageID: { not: media.id }, deletedAt: null },
@@ -568,42 +220,30 @@ export class NewsRepository implements INewsRepository {
         const key = { newsID_imageID_imageType: { newsID, imageID: media.id, imageType: image.imageType } };
         const existing = await tx.newsImage.findUnique({ where: key });
         const row = existing
-          ? await tx.newsImage.update({
-              where: { id: existing.id },
-              data: { deletedAt: null, focalPointX: image.focalPointX, focalPointY: image.focalPointY, sortOrder: image.sortOrder ?? 0, updatedAt: now },
-            })
-          : await tx.newsImage.create({
-              data: { newsID, imageID: media.id, imageType: image.imageType, focalPointX: image.focalPointX, focalPointY: image.focalPointY, sortOrder: image.sortOrder ?? 0 },
-            });
-        imageRows.push({ id: row.id, imageType: row.imageType, imageUrl: media.imageUrl });
-        if (image.imageType === "DETAIL") {
-          await tx.newsAdditionalImage.create({ data: { newsID, imageUrl: media.imageUrl } });
-        }
+          ? await tx.newsImage.update({ where: { id: existing.id }, data: { deletedAt: null, focalPointX: image.focalPointX, focalPointY: image.focalPointY, sortOrder: image.sortOrder ?? 0, updatedAt: now } })
+          : await tx.newsImage.create({ data: { newsID, imageID: media.id, imageType: image.imageType, focalPointX: image.focalPointX, focalPointY: image.focalPointY, sortOrder: image.sortOrder ?? 0 } });
+        imageRows.push({ id: row.id, imageType: row.imageType });
+        if (image.imageType === "DETAIL") await tx.newsAdditionalImage.create({ data: { newsID, imageUrl: media.imageUrl } });
       }
 
       if (deletedImageIds.length) {
-        const removed = await tx.newsImage.findMany({
-          where: { id: { in: deletedImageIds }, newsID, imageType: "DETAIL", deletedAt: null },
-          include: { image: true },
-        });
+        const removed = await tx.newsImage.findMany({ where: { id: { in: deletedImageIds }, newsID, imageType: "DETAIL", deletedAt: null }, include: { image: true } });
         if (removed.length !== new Set(deletedImageIds).size) throw new AppError(ErrorCode.VALIDATION_ERROR, "One or more detail images do not belong to this news", 400);
         await tx.newsImage.updateMany({ where: { id: { in: deletedImageIds }, newsID }, data: { deletedAt: now } });
-        for (const row of removed) {
-          await tx.newsAdditionalImage.updateMany({ where: { newsID, imageUrl: row.image.imageUrl, deletedAt: null }, data: { deletedAt: now } });
-        }
+        for (const row of removed) await tx.newsAdditionalImage.updateMany({ where: { newsID, imageUrl: row.image.imageUrl, deletedAt: null }, data: { deletedAt: now } });
       }
 
       if (deletedAdditionalImagesId.length) {
         const removed = await tx.newsAdditionalImage.findMany({ where: { id: { in: deletedAdditionalImagesId }, newsID, deletedAt: null } });
         if (removed.length !== new Set(deletedAdditionalImagesId).size) throw new AppError(ErrorCode.VALIDATION_ERROR, "One or more detail images do not belong to this news", 400);
         await tx.newsAdditionalImage.updateMany({ where: { id: { in: deletedAdditionalImagesId }, newsID }, data: { deletedAt: now } });
-        const media = await tx.imageMedia.findMany({ where: { imageUrl: { in: removed.map((image) => image.imageUrl) } }, select: { id: true, imageUrl: true } });
-        await tx.newsImage.updateMany({ where: { newsID, imageType: "DETAIL", imageID: { in: media.map((image) => image.id) }, deletedAt: null }, data: { deletedAt: now } });
+        const media = await tx.imageMedia.findMany({ where: { imageUrl: { in: removed.map((image) => image.imageUrl) } }, select: { id: true } });
+        await tx.newsImage.updateMany({ where: { newsID, imageType: "DETAIL", imageID: { in: media.map(({ id }) => id) }, deletedAt: null }, data: { deletedAt: now } });
       }
 
       if (detailImageOrder) {
         const active = await tx.newsImage.findMany({ where: { newsID, imageType: "DETAIL", deletedAt: null } });
-        const newIDs = imageRows.filter((row) => row.imageType === "DETAIL").map((row) => row.id);
+        const newIDs = imageRows.filter((row) => row.imageType === "DETAIL").map(({ id }) => id);
         const orderedIDs = detailImageOrder.map((value) => value.startsWith("new:") ? newIDs[Number(value.slice(4))] : Number(value));
         if (orderedIDs.length !== active.length || new Set(orderedIDs).size !== active.length || active.some((row) => !orderedIDs.includes(row.id))) {
           throw new AppError(ErrorCode.VALIDATION_ERROR, "Detail image order must include every active image exactly once", 400);
@@ -619,19 +259,13 @@ export class NewsRepository implements INewsRepository {
 
       const result = await tx.news.findUniqueOrThrow({
         where: { id: news.id },
-        include: {
-          tag: true, newsCategory: true,
-          newsImages: { where: { deletedAt: null }, include: { image: true }, orderBy: { sortOrder: "asc" } },
-          newsAdditionalImages: { where: { deletedAt: null }, orderBy: { id: "asc" } },
-        },
+        include: { newsCategory: true, newsImages, newsAdditionalImages: { where: { deletedAt: null }, orderBy: { id: "asc" } } },
       });
       return {
         ...result,
         category: result.newsCategory,
         images: result.newsImages.map(({ image, ...row }) => ({ ...row, imageUrl: image.imageUrl })),
-        tag: result.tag ? { ...result.tag, tagsGroupsId: result.tag.tageGroupsId } : undefined,
       };
     });
   }
-
 }

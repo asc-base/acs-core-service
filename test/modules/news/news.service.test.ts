@@ -4,7 +4,6 @@ import type {
   CreateNewsDTO,
   News,
   NewsCreatePayload,
-  NewsFeature,
   NewsWithAdditionalImages,
   NewsUpdatePayload,
 } from "../../../src/modules/news/domain/news";
@@ -27,8 +26,7 @@ const newsFixture = (focalPoints?: {
   thumbnail: "https://example.com/thumbnail.jpg",
   thumbnailFocalPointX: focalPoints?.thumbnailFocalPointX ?? null,
   thumbnailFocalPointY: focalPoints?.thumbnailFocalPointY ?? null,
-  tagID: 1,
-  tag: { id: 1, name: "Announcement", tagsGroupsId: 1 },
+  category: { id: 1, code: "ANNOUNCEMENT", name: "Announcement" },
   createdAt: startDate,
   updatedAt: startDate,
   deletedAt: null,
@@ -53,24 +51,8 @@ class FakeNewsRepository {
     return { ...this.news, newsAdditionalImages: [] };
   }
 
-  async upsertNewsFeature(): Promise<NewsFeature> {
-    throw new Error("Not implemented");
-  }
-
-  async getNewsFeaturesBy(): Promise<NewsFeature[]> {
-    return [];
-  }
-
   async countNews(): Promise<number> {
     return 1;
-  }
-
-  async countNewsFeatures(): Promise<number> {
-    return 0;
-  }
-
-  async getNewsFeatureById(): Promise<NewsFeature | null> {
-    return null;
   }
 
   async getNewsBulletins(type: "HIGHLIGHT" | "ANNOUNCEMENT") {
@@ -108,7 +90,7 @@ const createNewsInput = (focalPoints?: {
   detail: "News detail",
   startDate,
   thumbnail: png(),
-  tagID: 1,
+  newsCategoryId: 1,
   ...focalPoints,
 });
 

@@ -3,7 +3,6 @@ import {
   ProjectQueryParams,
   ProjectCreatePayload,
   ProjectUpdatePayload,
-  ProjectTagPayload,
   ProjectMemberPayload,
   ProjectCoursePayload,
 } from "./project";
@@ -12,13 +11,6 @@ export interface IProjectRepository {
   createProject(
     projectData: ProjectCreatePayload,
   ): Promise<Project>;
-  createProjectTag(
-    data: ProjectTagPayload[],
-  ): Promise<void>;
-  deleteProjectTag(
-    projectID: number,
-    tagID: number[],
-  ): Promise<void>;
   createProjectMember(
     data: ProjectMemberPayload[],
   ): Promise<void>;

@@ -5,43 +5,39 @@ import {
   CurriculumDTO,
   CurriculumSchema,
 } from "../../curriculums/domain/curriculum";
+import { CoursePlain } from "../../../generated/prismabox/Course";
+import { PreCoursePlain } from "../../../generated/prismabox/PreCourse";
 
 const CommonCourseField = {
-  courseCode: t.String(),
-  courseNameTh: t.String(),
-  courseNameEn: t.String(),
-  credits: t.String(),
-  detail: t.String(),
+  ...t.Pick(CoursePlain, [
+    "courseCode",
+    "courseNameTh",
+    "courseNameEn",
+    "credits",
+    "detail",
+  ]).properties,
 };
 
 export const CourseSchema = t.Recursive((Self) =>
-  t.Intersect([
-    t.Object({
-      id: t.Number(),
-      ...CommonCourseField,
-      typeCourseID: t.Number(),
-      curriculumID: t.Number(),
-      typeCourse: TypeCourseSchema,
-      curriculum: t.Intersect([CurriculumSchema, BaseModelSchema]),
-      preCourses: t.Optional(
-        t.Array(
-          t.Object({
-            prerequisite: Self,
-          }),
-        ),
-      ),
-    }),
-    BaseModelSchema,
-  ]),
+  t.Object({
+    ...t.Pick(CoursePlain, ["id", "typeCourseID", "curriculumID"]).properties,
+    ...CommonCourseField,
+    typeCourse: TypeCourseSchema,
+    curriculum: CurriculumSchema,
+    preCourses: t.Optional(
+      t.Array(t.Object({ ...PreCoursePlain.properties, prerequisite: Self })),
+    ),
+    ...BaseModelSchema.properties,
+  }),
 );
 
 export const PrerequisitesDTO = t.Object({
-  id: t.Number(),
+  ...t.Pick(CoursePlain, ["id"]).properties,
   ...CommonCourseField,
 });
 
 export const CourseDTO = t.Object({
-  id: t.Number(),
+  ...t.Pick(CoursePlain, ["id"]).properties,
   ...CommonCourseField,
   typeCourse: TypeCourseSchema,
   curriculum: CurriculumDTO,
@@ -75,15 +71,13 @@ export const UpdateCourseDTO = t.Partial(
 
 export const CourseCreatePayloadSchema = t.Object({
   ...CommonCourseField,
-  typeCourseID: t.Number(),
-  curriculumID: t.Number(),
+  ...t.Pick(CoursePlain, ["typeCourseID", "curriculumID"]).properties,
 });
 
 export const CourseUpdatePayloadSchema = t.Partial(
   t.Object({
     ...CommonCourseField,
-    typeCourseID: t.Number(),
-    curriculumID: t.Number(),
+    ...t.Pick(CoursePlain, ["typeCourseID", "curriculumID"]).properties,
     updatedAt: t.Date(),
     deletedAt: t.Nullable(t.Date()),
   }),

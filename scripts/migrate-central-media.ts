@@ -113,7 +113,7 @@ async function inventory() {
     selectedGroups.includes("curriculums") ? prisma.curriculum.findMany({ select: { thumbnailURL: true } }) : [],
     selectedGroups.includes("class-books") ? prisma.classBook.findMany({ select: { thumbnailURL: true } }) : [],
     selectedGroups.includes("projects") ? prisma.project.findMany({ select: { thumbnailURL: true, assetsURL: true } }) : [],
-    selectedGroups.includes("news") ? prisma.news.findMany({ include: { newsFeatures: true, newsAdditionalImages: true } }) : [],
+    selectedGroups.includes("news") ? prisma.news.findMany({ include: { newsAdditionalImages: true } }) : [],
   ]);
   const urls = new Set(media.map(({ imageUrl }) => imageUrl));
   const sourceURLs = [
@@ -121,7 +121,7 @@ async function inventory() {
     ...courseRows.map((row) => row.thumbnailURL),
     ...cohortRows.map((row) => row.thumbnailURL),
     ...projectRows.flatMap((row) => [row.thumbnailURL, ...(row.assetsURL ?? "").split(",").filter((url) => imageURL(url))]),
-    ...newsRows.flatMap((row) => [row.thumbnail, ...row.newsFeatures.map((feature) => feature.thumbnailURL), ...row.newsAdditionalImages.map((image) => image.imageUrl)]).filter((url): url is string => Boolean(url)),
+    ...newsRows.flatMap((row) => [row.thumbnail, ...row.newsAdditionalImages.map((image) => image.imageUrl)]).filter((url): url is string => Boolean(url)),
     ...media.map(({ imageUrl }) => imageUrl),
   ];
   const uniqueSourceURLs = [...new Set(sourceURLs)];
@@ -159,14 +159,12 @@ async function linkOwnerMedia() {
   if (selectedGroups.includes("profile")) await backfillProfileMedia("--apply");
   if (selectedGroups.includes("news")) {
     await backfillNewsMedia("--apply");
-    const [news, features, additional] = await Promise.all([
+    const [news, additional] = await Promise.all([
       prisma.news.findMany({ select: { thumbnail: true } }),
-      prisma.newsFeatures.findMany({ select: { thumbnailURL: true } }),
       prisma.newsAdditionalImage.findMany({ select: { imageUrl: true } }),
     ]);
     const urls = [...new Set([
       ...news.map((row) => row.thumbnail),
-      ...features.map((row) => row.thumbnailURL),
       ...additional.map((row) => row.imageUrl),
     ].filter((url): url is string => Boolean(url)))];
     for (const imageUrl of urls) {
@@ -230,13 +228,12 @@ async function verifyDestination(fileKey: string, expectedHash: string) {
 }
 
 async function ownersFor(imageID: number, imageUrl: string): Promise<ManifestRecord["owners"]> {
-  const [users, projects, curriculums, classBooks, news, features, additional] = await Promise.all([
+  const [users, projects, curriculums, classBooks, news, additional] = await Promise.all([
     prisma.user.findMany({ where: { OR: [{ imageID }, { imageUrl }] }, select: { id: true, imageUrl: true } }),
     prisma.project.findMany({ where: { OR: [{ imageID }, { thumbnailURL: imageUrl }, { assetsURL: { contains: imageUrl } }] }, select: { id: true, thumbnailURL: true, assetsURL: true } }),
     prisma.curriculum.findMany({ where: { OR: [{ imageID }, { thumbnailURL: imageUrl }] }, select: { id: true, thumbnailURL: true } }),
     prisma.classBook.findMany({ where: { OR: [{ imageID }, { thumbnailURL: imageUrl }] }, select: { id: true, thumbnailURL: true } }),
     prisma.news.findMany({ where: { thumbnail: imageUrl }, select: { id: true, thumbnail: true } }),
-    prisma.newsFeatures.findMany({ where: { thumbnailURL: imageUrl }, select: { id: true, thumbnailURL: true } }),
     prisma.newsAdditionalImage.findMany({ where: { imageUrl }, select: { id: true, imageUrl: true } }),
   ]);
   return [
@@ -248,15 +245,21 @@ async function ownersFor(imageID: number, imageUrl: string): Promise<ManifestRec
     ...curriculums.filter((row) => row.thumbnailURL === imageUrl).map((row) => ({ table: "curriculum", id: row.id, field: "thumbnailURL", before: imageUrl, after: "" })),
     ...classBooks.filter((row) => row.thumbnailURL === imageUrl).map((row) => ({ table: "classBook", id: row.id, field: "thumbnailURL", before: imageUrl, after: "" })),
     ...news.map((row) => ({ table: "news", id: row.id, field: "thumbnail", before: row.thumbnail!, after: "" })),
-    ...features.map((row) => ({ table: "newsFeatures", id: row.id, field: "thumbnailURL", before: row.thumbnailURL, after: "" })),
     ...additional.map((row) => ({ table: "newsAdditionalImage", id: row.id, field: "imageUrl", before: row.imageUrl, after: "" })),
   ];
 }
 
+function rejectRetiredFeatureManifest(records: ManifestRecord[]) {
+  if (records.some((record) => record.owners.some((owner) => owner.table === "newsFeatures"))) {
+    throw new Error("This media manifest contains news_features owners. Use the pre-retirement database and release to apply or roll back it.");
+  }
+}
+
 async function migrateObjects() {
   if (!s3 || !bucket || !publicBase) throw new Error("RustFS credentials, bucket, endpoint and public URL must be configured");
-  await linkOwnerMedia();
   const previous = existsSync(manifestPath) ? readManifest() : [];
+  rejectRetiredFeatureManifest(previous);
+  await linkOwnerMedia();
   const journal = new Map(previous.map((entry) => [entry.imageID, entry]));
   const done = new Set(previous.filter((entry) => entry.state === "committed").map((entry) => entry.imageID));
   const failures: string[] = [];
@@ -331,7 +334,6 @@ async function migrateObjects() {
           if (owner.table === "curriculum") await tx.curriculum.updateMany({ where: { ...where, thumbnailURL: owner.before }, data: { thumbnailURL: owner.after } });
           if (owner.table === "classBook") await tx.classBook.updateMany({ where: { ...where, thumbnailURL: owner.before }, data: { thumbnailURL: owner.after } });
           if (owner.table === "news") await tx.news.updateMany({ where: { ...where, thumbnail: owner.before }, data: { thumbnail: owner.after } });
-          if (owner.table === "newsFeatures") await tx.newsFeatures.updateMany({ where: { ...where, thumbnailURL: owner.before }, data: { thumbnailURL: owner.after } });
           if (owner.table === "newsAdditionalImage") await tx.newsAdditionalImage.updateMany({ where: { ...where, imageUrl: owner.before }, data: { imageUrl: owner.after } });
         }
       });
@@ -353,14 +355,13 @@ async function selectedMediaIDs() {
   const ids = new Set<number>();
   if (selectedGroups.includes("profile")) for (const row of await prisma.user.findMany({ where: { imageID: { not: null } }, select: { imageID: true } })) if (row.imageID !== null) ids.add(row.imageID);
   if (selectedGroups.includes("news")) {
-    const [newsImages, news, features, additionalImages] = await Promise.all([
+    const [newsImages, news, additionalImages] = await Promise.all([
       prisma.newsImage.findMany({ select: { imageID: true } }),
       prisma.news.findMany({ select: { thumbnail: true } }),
-      prisma.newsFeatures.findMany({ select: { thumbnailURL: true } }),
       prisma.newsAdditionalImage.findMany({ select: { imageUrl: true } }),
     ]);
     for (const row of newsImages) ids.add(row.imageID);
-    const legacyURLs = [...news.map((row) => row.thumbnail), ...features.map((row) => row.thumbnailURL), ...additionalImages.map((row) => row.imageUrl)].filter((url): url is string => Boolean(url));
+    const legacyURLs = [...news.map((row) => row.thumbnail), ...additionalImages.map((row) => row.imageUrl)].filter((url): url is string => Boolean(url));
     if (legacyURLs.length) for (const row of await prisma.imageMedia.findMany({ where: { imageUrl: { in: legacyURLs } }, select: { id: true } })) ids.add(row.id);
   }
   if (selectedGroups.includes("projects")) {
@@ -374,9 +375,11 @@ async function selectedMediaIDs() {
 
 async function verifyManifest() {
   if (!s3 || !bucket) throw new Error("RustFS credentials and bucket must be configured");
+  const manifest = readManifest();
+  rejectRetiredFeatureManifest(manifest);
   const linkedIDs = await selectedMediaIDs();
   const selectedIDs = new Set(linkedIDs);
-  const records = readManifest().filter((record) => record.state === "committed" && selectedIDs.has(record.imageID));
+  const records = manifest.filter((record) => record.state === "committed" && selectedIDs.has(record.imageID));
   const errors: string[] = [];
   const recordedIDs = new Set(records.map((record) => record.imageID));
   for (const record of records) {
@@ -419,8 +422,10 @@ async function verifyManifest() {
 }
 
 async function rollbackManifest() {
+  const manifest = readManifest();
+  rejectRetiredFeatureManifest(manifest);
   const selectedIDs = new Set(await selectedMediaIDs());
-  const records = readManifest().filter((record) => record.state === "committed" && selectedIDs.has(record.imageID)).reverse();
+  const records = manifest.filter((record) => record.state === "committed" && selectedIDs.has(record.imageID)).reverse();
   for (const record of records) {
     await prisma.$transaction(async (tx) => {
       const media = await tx.imageMedia.findUnique({ where: { id: record.imageID } });
@@ -446,7 +451,6 @@ async function rollbackManifest() {
         if (owner.table === "curriculum") await tx.curriculum.updateMany({ where: { ...where, thumbnailURL: owner.after }, data: { thumbnailURL: owner.before } });
         if (owner.table === "classBook") await tx.classBook.updateMany({ where: { ...where, thumbnailURL: owner.after }, data: { thumbnailURL: owner.before } });
         if (owner.table === "news") await tx.news.updateMany({ where: { ...where, thumbnail: owner.after }, data: { thumbnail: owner.before } });
-        if (owner.table === "newsFeatures") await tx.newsFeatures.updateMany({ where: { ...where, thumbnailURL: owner.after }, data: { thumbnailURL: owner.before } });
         if (owner.table === "newsAdditionalImage") await tx.newsAdditionalImage.updateMany({ where: { ...where, imageUrl: owner.after }, data: { imageUrl: owner.before } });
       }
     });

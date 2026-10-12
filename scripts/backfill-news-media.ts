@@ -1,112 +1,58 @@
 /* eslint-disable no-console */
 import { prisma } from "../src/lib/db";
-import { syncNewsCategories } from "../src/infrastructure/sync-news-categories";
 
 export async function backfillNewsMedia(mode: "--dry-run" | "--apply") {
-  const [news, newsTags] = await Promise.all([
-    prisma.news.findMany({
-      include: {
-        tag: { include: { tageGroups: true } },
-        newsFeatures: { include: { tag: { include: { tageGroups: true } } } },
-        newsAdditionalImages: { orderBy: { id: "asc" } },
-      },
-    }),
-    prisma.tag.findMany({ where: { tageGroups: { name: "news" } } }),
+  const news = await prisma.news.findMany({
+    include: {
+      newsImages: { where: { deletedAt: null }, include: { image: true } },
+      newsAdditionalImages: { orderBy: { id: "asc" } },
+    },
+  });
+  const warnings = news.flatMap((item) => [
+    ...(!item.thumbnail ? [`news ${item.id}: missing legacy thumbnail`] : []),
+    ...(item.newsAdditionalImages.filter((image) => !image.deletedAt).length > 10 ? [`news ${item.id}: more than 10 detail images (all will be preserved)`] : []),
   ]);
-
-  const warnings: string[] = [];
-  for (const item of news) {
-    if (!newsTags.some((tag) => tag.id === item.tagID)) warnings.push(`news ${item.id}: category tag ${item.tagID} is outside the news group`);
-    if (!item.thumbnail) warnings.push(`news ${item.id}: missing thumbnail`);
-    if (item.newsAdditionalImages.filter((image) => !image.deletedAt).length > 10) {
-      warnings.push(`news ${item.id}: more than 10 detail images (all will be preserved)`);
-    }
-    for (const feature of item.newsFeatures.filter((feature) => !feature.deletedAt)) {
-      if (!feature.tag.tageGroups || feature.tag.tageGroups.name !== "news-feature") {
-        warnings.push(`news ${item.id}: feature ${feature.id} has an unexpected tag group`);
-      }
-    }
-  }
-  console.log(`${news.length} news, ${newsTags.length} categories, ${warnings.length} warning(s)`);
+  console.log(`${news.length} news, ${warnings.length} warning(s)`);
   warnings.forEach((warning) => console.warn(`WARN ${warning}`));
-  if (mode !== "--dry-run") {
-  await syncNewsCategories(prisma, { onlyUnassigned: true });
-  const bulletinByFeatureName: Record<string, "HIGHLIGHT" | "ANNOUNCEMENT"> = {
-    newshighlight: "HIGHLIGHT",
-    announcement: "ANNOUNCEMENT",
-  };
+  if (mode === "--dry-run") return;
+
   for (const item of news) {
     await prisma.$transaction(async (tx) => {
-      await tx.news.update({
-        where: { id: item.id },
-        data: {
-          eventStartAt: item.startDate,
-          eventEndAt: item.dueDate,
-        },
-      });
-
-      const activeFeatures = item.newsFeatures.filter((feature) => !feature.deletedAt);
-      const featureImage = (name: string) => activeFeatures.find(
-        (feature) => feature.tag.tageGroups?.name === "news-feature" && feature.tag.name.toLowerCase() === name,
-      );
-      const card = featureImage("announcement")?.thumbnailURL || item.thumbnail;
-      const thumbnail = featureImage("newshighlight")?.thumbnailURL || item.thumbnail;
-      const ensureImage = async (url: string) => tx.imageMedia.upsert({
-        where: { imageUrl: url },
-        create: { provider: "legacy_url", imageUrl: url },
+      await tx.news.update({ where: { id: item.id }, data: { eventStartAt: item.startDate, eventEndAt: item.dueDate } });
+      const ensureImage = async (imageUrl: string) => tx.imageMedia.upsert({
+        where: { imageUrl },
+        create: { provider: "legacy_url", imageUrl },
         update: {},
       });
       const addLink = async (
-        url: string,
+        imageUrl: string,
         imageType: "CARD" | "THUMBNAIL" | "DETAIL",
         focalPointX: number | null = null,
         focalPointY: number | null = null,
         sortOrder = 0,
         deletedAt = item.deletedAt,
       ) => {
-        const image = await ensureImage(url);
+        const image = await ensureImage(imageUrl);
         const key = { newsID_imageID_imageType: { newsID: item.id, imageID: image.id, imageType } };
         if (await tx.newsImage.findUnique({ where: key })) return;
-        if (imageType !== "DETAIL" && await tx.newsImage.findFirst({
-          where: { newsID: item.id, imageType, deletedAt: null },
-        })) return;
-        await tx.newsImage.create({
-          data: { newsID: item.id, imageID: image.id, imageType, focalPointX, focalPointY, sortOrder, deletedAt },
-        });
+        if (imageType !== "DETAIL" && await tx.newsImage.findFirst({ where: { newsID: item.id, imageType, deletedAt: null } })) return;
+        await tx.newsImage.create({ data: { newsID: item.id, imageID: image.id, imageType, focalPointX, focalPointY, sortOrder, deletedAt } });
       };
 
-      if (card) {
-        const feature = featureImage("announcement");
-        await addLink(card, "CARD", feature?.thumbnailFocalPointX ?? item.thumbnailFocalPointX, feature?.thumbnailFocalPointY ?? item.thumbnailFocalPointY);
-      }
-      if (thumbnail) {
-        const feature = featureImage("newshighlight");
-        await addLink(thumbnail, "THUMBNAIL", feature?.thumbnailFocalPointX ?? item.thumbnailFocalPointX, feature?.thumbnailFocalPointY ?? item.thumbnailFocalPointY);
-      }
-      if (item.thumbnail && item.thumbnail !== card && item.thumbnail !== thumbnail) {
+      const cardExists = item.newsImages.some(({ imageType }) => imageType === "CARD");
+      const thumbnailExists = item.newsImages.some(({ imageType }) => imageType === "THUMBNAIL");
+      if (!cardExists && item.thumbnail) await addLink(item.thumbnail, "CARD", item.thumbnailFocalPointX, item.thumbnailFocalPointY);
+      if (!thumbnailExists && item.thumbnail) await addLink(item.thumbnail, "THUMBNAIL", item.thumbnailFocalPointX, item.thumbnailFocalPointY);
+      if (item.thumbnail && item.newsImages.every(({ image }) => image.imageUrl !== item.thumbnail)) {
         await addLink(item.thumbnail, "DETAIL", item.thumbnailFocalPointX, item.thumbnailFocalPointY);
       }
       let order = 0;
       for (const image of item.newsAdditionalImages) {
         await addLink(image.imageUrl, "DETAIL", null, null, order++, image.deletedAt ?? item.deletedAt);
       }
-
-      for (const feature of activeFeatures) {
-        const bulletinType = feature.tag.tageGroups?.name === "news-feature"
-          ? bulletinByFeatureName[feature.tag.name.toLowerCase()]
-          : undefined;
-        if (bulletinType) {
-          await tx.newsBulletin.upsert({
-            where: { newsID_type: { newsID: item.id, type: bulletinType } },
-            create: { newsID: item.id, type: bulletinType, deletedAt: item.deletedAt },
-            update: { deletedAt: item.deletedAt },
-          });
-        }
-      }
     });
   }
-  console.log(`Backfilled ${news.length} news item(s)`);
-  }
+  console.log(`Backfilled media for ${news.length} news item(s)`);
 }
 
 if (process.argv[1]?.endsWith("backfill-news-media.ts")) {
