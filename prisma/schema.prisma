@@ -205,7 +205,7 @@ model News {
   tagID        Int            @map("tag_id")
   tag          Tag            @relation(fields: [tagID], references: [id])
   newsCategoryID Int?          @map("news_category_id")
-  newsCategory   NewsCategory? @relation(fields: [newsCategoryID], references: [id])
+  newsCategory   NewsCategory? @relation(fields: [newsCategoryID], references: [id], onDelete: SetNull, onUpdate: Cascade)
   eventStartAt   DateTime?      @map("event_start_at")
   eventEndAt     DateTime?      @map("event_end_at")
   newsFeatures NewsFeatures[]
@@ -213,6 +213,7 @@ model News {
   newsImages   NewsImage[]
   newsBulletins NewsBulletin[]
 
+  @@index([newsCategoryID])
   @@map("news")
   @@schema("public")
 }

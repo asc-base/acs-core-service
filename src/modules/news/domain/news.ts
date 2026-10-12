@@ -135,6 +135,7 @@ export const NewsUpdateDTO = t.Partial(
 
 export const NewsQueryParams = t.Object({
   tagID: t.Optional(t.Numeric()),
+  newsCategoryId: t.Optional(t.Numeric()),
   ...CommonQueryParams,
   search: t.Optional(t.String()),
   searchBy: t.Optional(t.String()),
@@ -222,7 +223,7 @@ export const NewsCreatePayloadSchema = t.Object({
   ...CommonNewsFields,
   ...FocalPointInputFields,
   thumbnail: t.String(),
-  tagID: t.Numeric(),
+  tagID: t.Optional(t.Numeric()),
   newsCategoryID: t.Optional(t.Numeric()),
   eventStartAt: t.Optional(t.Date()),
   eventEndAt: t.Optional(t.Nullable(t.Date())),

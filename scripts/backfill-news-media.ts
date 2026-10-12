@@ -30,19 +30,16 @@ export async function backfillNewsMedia(mode: "--dry-run" | "--apply") {
   console.log(`${news.length} news, ${newsTags.length} categories, ${warnings.length} warning(s)`);
   warnings.forEach((warning) => console.warn(`WARN ${warning}`));
   if (mode !== "--dry-run") {
-  await syncNewsCategories(prisma, newsTags);
-
+  await syncNewsCategories(prisma, { onlyUnassigned: true });
   const bulletinByFeatureName: Record<string, "HIGHLIGHT" | "ANNOUNCEMENT"> = {
     newshighlight: "HIGHLIGHT",
     announcement: "ANNOUNCEMENT",
   };
   for (const item of news) {
     await prisma.$transaction(async (tx) => {
-      const category = newsTags.find((tag) => tag.id === item.tagID);
       await tx.news.update({
         where: { id: item.id },
         data: {
-          ...(category ? { newsCategoryID: category.id } : {}),
           eventStartAt: item.startDate,
           eventEndAt: item.dueDate,
         },

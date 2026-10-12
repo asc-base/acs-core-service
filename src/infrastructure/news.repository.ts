@@ -16,8 +16,49 @@ import { AppError } from "../core/error/app-error";
 import { ErrorCode } from "../core/types/errors";
 import { calculatePagination } from "../core/utils/calculator";
 import { PrismaInstance } from "../lib/db";
+async function resolveNewsLinks(
+  tx: Prisma.TransactionClient,
+  newsCategoryID?: number,
+  legacyTagID?: number,
+) {
+  const category = newsCategoryID === undefined
+    ? undefined
+    : await tx.newsCategory.findUnique({ where: { id: newsCategoryID } });
+  if (newsCategoryID !== undefined && !category) {
+    throw new AppError(ErrorCode.VALIDATION_ERROR, "News category does not exist", 400);
+  }
+
+  let tag = legacyTagID === undefined
+    ? undefined
+    : await tx.tag.findUnique({ where: { id: legacyTagID }, include: { tageGroups: true } });
+  if (legacyTagID !== undefined && tag?.tageGroups?.name !== "news") {
+    throw new AppError(ErrorCode.VALIDATION_ERROR, "tagID must refer to a news tag", 400);
+  }
+  if (category && tag && category.name !== tag.name) {
+    throw new AppError(ErrorCode.VALIDATION_ERROR, "tagID and newsCategoryId must refer to the same news category", 400);
+  }
+  if (category && !tag) {
+    tag = await tx.tag.findFirst({ where: { name: category.name, tageGroups: { name: "news" } }, include: { tageGroups: true } }) ?? undefined;
+  }
+  if (!tag) throw new AppError(ErrorCode.VALIDATION_ERROR, "A news category is required", 400);
+
+  const resolvedCategory = category ?? await tx.newsCategory.findFirst({ where: { name: tag.name }, orderBy: { id: "asc" } });
+  return { tagID: tag.id, newsCategoryID: resolvedCategory?.id };
+}
+
 export class NewsRepository implements INewsRepository {
   constructor(private readonly db: PrismaInstance) { }
+
+  private async getNewsFilter(query: NewsQueryParams): Promise<Prisma.NewsWhereInput> {
+    if (query.newsCategoryId !== undefined) return { newsCategoryID: query.newsCategoryId };
+    if (query.tagID === undefined) return {};
+    const tag = await this.db.tag.findUnique({ where: { id: query.tagID }, include: { tageGroups: true } });
+    if (tag?.tageGroups?.name === "news") {
+      const category = await this.db.newsCategory.findFirst({ where: { name: tag.name }, orderBy: { id: "asc" }, select: { id: true } });
+      if (category) return { newsCategoryID: category.id };
+    }
+    return { tagID: query.tagID };
+  }
 
   async getNewsBulletins(type: NewsBulletinType): Promise<NewsBulletinView[]> {
     const rows = await this.db.newsBulletin.findMany({
@@ -145,12 +186,12 @@ export class NewsRepository implements INewsRepository {
   async createNews(data: NewsCreatePayload): Promise<NewsWithAdditionalImages> {
     const { images = [], additionalImageUrls = [], newsCategoryID, tagID, ...fields } = data;
     return this.db.$transaction(async (tx) => {
-    const categoryID = newsCategoryID ?? (await tx.newsCategory.findUnique({ where: { id: tagID }, select: { id: true } }))?.id;
+    const links = await resolveNewsLinks(tx, newsCategoryID, tagID);
     const news = await tx.news.create({
       data: {
         ...fields,
-        tag: { connect: { id: tagID } },
-        ...(categoryID ? { newsCategory: { connect: { id: categoryID } } } : {}),
+        tag: { connect: { id: links.tagID } },
+        ...(links.newsCategoryID !== undefined ? { newsCategory: { connect: { id: links.newsCategoryID } } } : {}),
         ...(images.length ? {
           newsImages: {
             create: images.map(({ media, ...image }) => ({
@@ -202,6 +243,7 @@ export class NewsRepository implements INewsRepository {
       search,
       searchBy,
     } = query;
+    const newsFilter = await this.getNewsFilter(query);
     const newsList = await this.db.news.findMany({
       skip: calculatePagination(page, pageSize),
       take: pageSize,
@@ -209,7 +251,7 @@ export class NewsRepository implements INewsRepository {
         [orderBy]: sortBy,
       },
       where: {
-        ...(query.tagID && { tagID: query.tagID }),
+        ...newsFilter,
         ...(search &&
           searchBy && {
           [searchBy]: { contains: search, mode: "insensitive" },
@@ -412,9 +454,10 @@ export class NewsRepository implements INewsRepository {
   }
 
   async countNews(query: NewsQueryParams): Promise<number> {
+    const newsFilter = await this.getNewsFilter(query);
     const count = await this.db.news.count({
       where: {
-        ...(query.tagID && { tagID: query.tagID }),
+        ...newsFilter,
         ...(query.search && query.searchBy && { [query.searchBy]: { contains: query.search, mode: "insensitive" } }),
         deletedAt: null,
       },
@@ -482,19 +525,17 @@ export class NewsRepository implements INewsRepository {
     return this.db.$transaction(async (tx) => {
       const now = new Date();
       const imageRows: Array<{ id: number; imageType: string; imageUrl: string }> = [];
-      const categoryID = newsCategoryID !== undefined
-        ? newsCategoryID
-        : tagID !== undefined
-          ? (await tx.newsCategory.findUnique({ where: { id: tagID }, select: { id: true } }))?.id
-          : undefined;
+      const links = newsCategoryID !== undefined || tagID !== undefined
+        ? await resolveNewsLinks(tx, newsCategoryID, tagID)
+        : undefined;
       const news = await tx.news.update({
         where: { id: newsID, deletedAt: null },
         data: {
           ...newsData,
-          ...(tagID !== undefined ? { tag: { connect: { id: tagID } } } : {}),
-          ...(newsCategoryID !== undefined || tagID !== undefined
-            ? categoryID !== undefined
-              ? { newsCategory: { connect: { id: categoryID } } }
+          ...(links ? { tag: { connect: { id: links.tagID } } } : {}),
+          ...(links
+            ? links.newsCategoryID !== undefined
+              ? { newsCategory: { connect: { id: links.newsCategoryID } } }
               : { newsCategory: { disconnect: true } }
             : {}),
         },

@@ -51,14 +51,11 @@ export class NewsService implements INewsService {
     const cardFile = data.cardImage ?? data.thumbnail ?? data.thumbnailImage;
     const thumbnailFile = data.thumbnailImage ?? data.cardImage ?? data.thumbnail;
     const detailFiles = data.detailImages ?? data.additionalImages ?? [];
-    const categoryID = data.newsCategoryId ?? data.tagID;
+    const categoryID = data.newsCategoryId;
     const eventStartAt = data.eventStartAt ?? data.startDate;
     const eventEndAt = data.eventEndAt ?? data.dueDate ?? null;
-    if (!cardFile || !thumbnailFile || !categoryID || !eventStartAt) {
+    if (!cardFile || !thumbnailFile || (!categoryID && data.tagID === undefined) || !eventStartAt) {
       throw new AppError(ErrorCode.VALIDATION_ERROR, "Card image, category, and event start are required", 400);
-    }
-    if (data.tagID && data.newsCategoryId && data.tagID !== data.newsCategoryId) {
-      throw new AppError(ErrorCode.VALIDATION_ERROR, "Legacy tagID and newsCategoryId must match", 400);
     }
     if (data.startDate && data.eventStartAt && data.startDate.getTime() !== data.eventStartAt.getTime()) {
       throw new AppError(ErrorCode.VALIDATION_ERROR, "Legacy startDate and eventStartAt must match", 400);
@@ -106,8 +103,8 @@ export class NewsService implements INewsService {
       const payload: NewsCreatePayload = {
         title: data.title,
         detail: data.detail,
-        tagID: categoryID,
-        ...(data.newsCategoryId ? { newsCategoryID: data.newsCategoryId } : {}),
+        ...(data.tagID !== undefined ? { tagID: data.tagID } : {}),
+        ...(data.newsCategoryId !== undefined ? { newsCategoryID: data.newsCategoryId } : {}),
         startDate: eventStartAt,
         dueDate: eventEndAt,
         eventStartAt,
@@ -362,17 +359,13 @@ async updateNews(
       detailMedia.push(media);
       images.push({ imageType: "DETAIL", media: { ...media, fileName: file.name, contentType: detectedTypes.get(file), fileSize: file.size } });
     }
-    const categoryID = newsCategoryId ?? fields.tagID;
-    if (newsCategoryId && fields.tagID && newsCategoryId !== fields.tagID) {
-      throw new AppError(ErrorCode.VALIDATION_ERROR, "Legacy tagID and newsCategoryId must match", 400);
-    }
     const startAt = eventStartAt ?? fields.startDate;
     const endAt = eventEndAt !== undefined ? eventEndAt : fields.dueDate;
     const { thumbnailFocalPointX, thumbnailFocalPointY, startDate, dueDate, tagID, title, detail } = fields;
     const payload: NewsUpdatePayload = {
       ...(title !== undefined ? { title } : {}),
       ...(detail !== undefined ? { detail } : {}),
-      ...(categoryID !== undefined ? { tagID: categoryID } : tagID !== undefined ? { tagID } : {}),
+      ...(tagID !== undefined ? { tagID } : {}),
       ...(newsCategoryId !== undefined ? { newsCategoryID: newsCategoryId } : {}),
       ...(startAt !== undefined ? { startDate: startAt, eventStartAt: startAt } : startDate !== undefined ? { startDate } : {}),
       ...(endAt !== undefined ? { dueDate: endAt, eventEndAt: endAt } : dueDate !== undefined ? { dueDate } : {}),
