@@ -176,39 +176,25 @@ BEGIN
     RAISE EXCEPTION 'Duplicate news features cannot map to one bulletin: %', problem;
   END IF;
 
-  SELECT string_agg(format('news %s has a conflicting existing bulletin or image for %s', feature.news_id, lower(tag.name)), E'\n')
+  -- Existing target rows are authoritative; disabling a bulletin does not delete its image.
+  SELECT string_agg(format('news %s already has a different active image for %s', feature.news_id, lower(tag.name)), E'\n')
   INTO problem
   FROM public.news_features AS feature
   JOIN public.tags AS tag ON tag.id = feature.tag_id
   JOIN public.tag_groups AS tag_group ON tag_group.id = tag.tage_groups_id
-  LEFT JOIN public.news_bulletins AS bulletin
-    ON bulletin.news_id = feature.news_id
-   AND bulletin.type = CASE lower(tag.name) WHEN 'announcement' THEN 'ANNOUNCEMENT'::public.news_bulletin_type ELSE 'HIGHLIGHT'::public.news_bulletin_type END
-  LEFT JOIN public.image_media AS media ON media.image_url = feature.thumbnail_url
-  LEFT JOIN public.news_images AS image_link
-    ON image_link.news_id = feature.news_id
-   AND image_link.image_id = media.id
-   AND image_link.image_type = CASE lower(tag.name) WHEN 'announcement' THEN 'CARD'::public.news_image_type ELSE 'THUMBNAIL'::public.news_image_type END
   WHERE tag_group.name = 'news-feature'
-    AND (
-      (bulletin.id IS NOT NULL AND bulletin.deleted_at IS DISTINCT FROM feature.deleted_at) OR
-      (image_link.id IS NOT NULL AND (
-        image_link.deleted_at IS DISTINCT FROM feature.deleted_at OR
-        image_link.focal_point_x IS DISTINCT FROM feature.thumbnail_focal_point_x OR
-        image_link.focal_point_y IS DISTINCT FROM feature.thumbnail_focal_point_y
-      )) OR
-      (feature.deleted_at IS NULL AND EXISTS (
-        SELECT 1
-        FROM public.news_images AS other_link
-        JOIN public.image_media AS other_media ON other_media.id = other_link.image_id
-        WHERE other_link.news_id = feature.news_id
-          AND other_link.image_type = CASE lower(tag.name) WHEN 'announcement' THEN 'CARD'::public.news_image_type ELSE 'THUMBNAIL'::public.news_image_type END
-          AND other_link.deleted_at IS NULL
-          AND other_media.image_url <> feature.thumbnail_url
-      ))
+    AND feature.deleted_at IS NULL
+    AND EXISTS (
+      SELECT 1
+      FROM public.news_images AS other_link
+      JOIN public.image_media AS other_media ON other_media.id = other_link.image_id
+      WHERE other_link.news_id = feature.news_id
+        AND other_link.image_type = CASE lower(tag.name) WHEN 'announcement' THEN 'CARD'::public.news_image_type ELSE 'THUMBNAIL'::public.news_image_type END
+        AND other_link.deleted_at IS NULL
+        AND other_media.image_url <> feature.thumbnail_url
     );
   IF problem IS NOT NULL THEN
-    RAISE EXCEPTION 'News feature data conflicts with existing bulletins or images: %', problem;
+    RAISE EXCEPTION 'News feature mappings conflict with existing active images: %', problem;
   END IF;
 
   FOR item IN SELECT * FROM (VALUES
@@ -358,11 +344,7 @@ BEGIN
     LEFT JOIN public.image_media AS media ON media.image_url = feature.thumbnail_url
     LEFT JOIN public.news_images AS image_link ON image_link.news_id = feature.news_id AND image_link.image_id = media.id
       AND image_link.image_type = CASE lower(tag.name) WHEN 'announcement' THEN 'CARD'::public.news_image_type ELSE 'THUMBNAIL'::public.news_image_type END
-    WHERE tag_group.name = 'news-feature' AND (bulletin.id IS NULL OR image_link.id IS NULL
-      OR bulletin.deleted_at IS DISTINCT FROM feature.deleted_at
-      OR image_link.deleted_at IS DISTINCT FROM feature.deleted_at
-      OR image_link.focal_point_x IS DISTINCT FROM feature.thumbnail_focal_point_x
-      OR image_link.focal_point_y IS DISTINCT FROM feature.thumbnail_focal_point_y)
+    WHERE tag_group.name = 'news-feature' AND (bulletin.id IS NULL OR image_link.id IS NULL)
   ) THEN
     RAISE EXCEPTION 'News bulletin/media backfill verification failed';
   END IF;
