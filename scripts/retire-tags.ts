@@ -162,11 +162,19 @@ async function main() {
       if (seenFeatures.has(key)) report.conflicts.push(`news ${feature.news_id} has duplicate feature type ${type}`);
       seenFeatures.add(key);
       const bulletin = bulletins.rows.find((row) => row.news_id === feature.news_id && row.type === type);
-      if (bulletin && String(bulletin.deleted_at) !== String(feature.deleted_at)) report.conflicts.push(`news ${feature.news_id} has conflicting ${type} bulletin state`);
       const image = mediaRows.rows.find((row) => row.news_id === feature.news_id && row.image_url === feature.thumbnail_url && row.image_type === imageType);
-      if (image && (String(image.deleted_at) !== String(feature.deleted_at) || image.focal_point_x !== feature.focal_point_x || image.focal_point_y !== feature.focal_point_y)) report.conflicts.push(`news ${feature.news_id} has conflicting ${imageType} image state`);
       if (feature.deleted_at === null && mediaRows.rows.some((row) => row.news_id === feature.news_id && row.image_type === imageType && row.deleted_at === null && row.image_url !== feature.thumbnail_url)) report.conflicts.push(`news ${feature.news_id} already has a different active ${imageType} image`);
-      return { newsId: feature.news_id, oldTagId: feature.tag_id, name: feature.name, bulletinType: type, imageType, imageUrl: feature.thumbnail_url, deletedAt: feature.deleted_at };
+      return {
+        newsId: feature.news_id,
+        oldTagId: feature.tag_id,
+        name: feature.name,
+        bulletinType: type,
+        imageType,
+        imageUrl: feature.thumbnail_url,
+        deletedAt: feature.deleted_at,
+        preservesExistingBulletin: Boolean(bulletin),
+        preservesExistingImage: Boolean(image),
+      };
     });
     report.newsFeatures = { count: newsFeatures.rows.length, mappings: featureMappings };
 
