@@ -39,4 +39,16 @@ export class MasterDataRepository implements IMasterDataRepository {
     return this.prisma.newsCategory.findMany({ orderBy: { id: "asc" } });
   }
 
+  async getFields() {
+    return this.prisma.field.findMany({ orderBy: { id: "asc" } });
+  }
+
+  async getCategories() {
+    return this.prisma.category.findMany({ orderBy: { id: "asc" } });
+  }
+
+  async getProjectTypes() {
+    return this.prisma.projectType.findMany({ orderBy: { id: "asc" } });
+  }
+
 }

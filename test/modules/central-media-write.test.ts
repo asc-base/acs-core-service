@@ -64,7 +64,15 @@ describe("central media owner writes", () => {
   test("creates a Project and its ordered gallery relations in one transaction", async () => {
     const tx = {
       imageMedia: { upsert: vi.fn().mockResolvedValueOnce({ id: 41 }).mockResolvedValueOnce({ id: 42 }) },
-      project: { create: vi.fn().mockResolvedValue({ id: 7 }) },
+      project: { create: vi.fn().mockResolvedValue({ id: 7 }), findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 7 }) },
+      tag: { findMany: vi.fn().mockResolvedValue([]) },
+      projectTag: { findMany: vi.fn().mockResolvedValue([]) },
+      projectField: { deleteMany: vi.fn(), createMany: vi.fn() },
+      projectCategory: { deleteMany: vi.fn(), createMany: vi.fn() },
+      projectProjectType: { deleteMany: vi.fn(), createMany: vi.fn() },
+      field: { findMany: vi.fn().mockResolvedValue([]) },
+      category: { findMany: vi.fn().mockResolvedValue([]) },
+      projectType: { findMany: vi.fn().mockResolvedValue([]) },
     };
     const db = { $transaction: vi.fn((work: (transaction: typeof tx) => unknown) => work(tx)) } as unknown as PrismaInstance;
     const repository = new ProjectRepository(db);

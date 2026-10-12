@@ -33,11 +33,14 @@ export class ProjectFactory implements IProjectFactory {
       })),
       techStacks: project.techStacks ? project.techStacks.split(",") : [],
 
-      tag: project.projectTags?.map((projectTag) => ({
-        id: projectTag.tag.id,
-        name: projectTag.tag.name,
-        tagsGroupsId: projectTag.tag.tagsGroupsId,
+      tag: project.projectTags?.map(({ tag }) => ({
+        id: tag.id,
+        name: tag.name,
+        tagsGroupsId: tag.tageGroupsId,
       })) || [],
+      fields: (project.projectFields ?? []).map(({ field }) => field),
+      categories: (project.projectCategories ?? []).map(({ category }) => category),
+      projectTypes: (project.projectProjectTypes ?? []).map(({ type }) => type),
 
       member:
         project.projectMembers?.map((projectMember) => ({

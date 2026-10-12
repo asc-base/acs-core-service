@@ -10,6 +10,7 @@
     "media:backfill": "tsx scripts/backfill-profile-media.ts",
     "news-media:backfill": "tsx scripts/backfill-news-media.ts",
     "news-categories:backfill": "tsx scripts/backfill-news-categories.ts",
+    "project-classifications:backfill": "tsx scripts/backfill-project-classifications.ts",
     "media:migrate": "tsx scripts/migrate-central-media.ts",
     "media:bootstrap-rustfs": "tsx scripts/bootstrap-profile-media.ts",
     "lint": "eslint .",

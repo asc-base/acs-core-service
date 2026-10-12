@@ -46,9 +46,10 @@ export const ProjectSchema = t.Intersect([
       image: ImageMediaSchema,
     }))),
     techStacks: t.String(),
-    projectTags: t.Optional(t.Array(t.Object({
-      tag: Tag,
-    }))),
+    projectTags: t.Optional(t.Array(t.Object({ tag: t.Object({ id: t.Number(), name: t.String(), tageGroupsId: t.Number() }) }))),
+    projectFields: t.Optional(t.Array(t.Object({ field: t.Object({ id: t.Number(), name: t.String() }) }))),
+    projectCategories: t.Optional(t.Array(t.Object({ category: t.Object({ id: t.Number(), name: t.String() }) }))),
+    projectProjectTypes: t.Optional(t.Array(t.Object({ type: t.Object({ id: t.Number(), name: t.String() }) }))),
     projectMembers: t.Optional(t.Array(t.Object({
       user: UserSchema,
       role: RoleSchema,
@@ -69,7 +70,10 @@ export const CreateProjectDTO = t.Object({
   thumbnailFile: t.File(),
   ...CommonProjectFields,
   ...FocalPointInputFields,
-  tagsID: t.Array(t.Number()),
+  tagsID: t.Optional(t.Array(t.Number())),
+  fieldIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
+  categoryIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
+  projectTypeIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
   members: t.Array(t.Object(ProjectMemberFields)),
   coursesID: t.Array(t.Number()),
   assets: t.Files(),
@@ -87,6 +91,9 @@ export const ProjectDTO = t.Intersect([
     images: t.Optional(t.Array(ProjectImageDTO)),
     techStacks: t.Array(t.String()),
     tag: t.Array(Tag),
+    fields: t.Array(t.Object({ id: t.Number(), name: t.String() })),
+    categories: t.Array(t.Object({ id: t.Number(), name: t.String() })),
+    projectTypes: t.Array(t.Object({ id: t.Number(), name: t.String() })),
 
     member: t.Array(
       t.Intersect([
@@ -103,6 +110,9 @@ export const ProjectDTO = t.Intersect([
 
 export const ProjectQueryParams = t.Object({
   tagID: t.Optional(t.Array(t.Numeric())),
+  fieldIds: t.Optional(t.Array(t.Numeric())),
+  categoryIds: t.Optional(t.Array(t.Numeric())),
+  projectTypeIds: t.Optional(t.Array(t.Numeric())),
   courseID: t.Optional(t.Array(t.Numeric())),
   ...CommonQueryParams,
   search: t.Optional(t.String()),
@@ -120,6 +130,9 @@ export const UpdateProjectDTO = t.Object({
   ...FocalPointInputFields,
   newtagsID: t.Optional(t.Array(t.Number())),
   deletedtagsID: t.Optional(t.Array(t.Number())),
+  fieldIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
+  categoryIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
+  projectTypeIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
   newMembers: t.Optional(t.Array(t.Object(ProjectMemberFields))),
   deletedmembersID: t.Optional(t.Array(t.Numeric())),
   newCoursesID: t.Optional(t.Array(t.Number())),
@@ -128,7 +141,7 @@ export const UpdateProjectDTO = t.Object({
   techStacks: t.Optional(t.Array(t.String())),
 });
 
-export const ProjectCreatePayloadSchema = t.Object({ //มาดูอีกทีว่าต้องแก้ optional กับ required ไหม
+export const ProjectCreatePayloadSchema = t.Object({
   title: t.String(),
   details: t.String(),
   githubURL: t.String(),
@@ -140,6 +153,10 @@ export const ProjectCreatePayloadSchema = t.Object({ //มาดูอีกท�
   assetsURL: t.String(),
   ...FocalPointInputFields,
   techStacks: t.String(),
+  tagsID: t.Optional(t.Array(t.Number())),
+  fieldIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
+  categoryIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
+  projectTypeIds: t.Optional(t.Array(t.Integer({ minimum: 1 }))),
 });
 
 export const ProjectUpdatePayloadSchema = t.Partial(
@@ -155,14 +172,14 @@ export const ProjectUpdatePayloadSchema = t.Partial(
     assetsURL: t.String(),
     ...FocalPointInputFields,
     techStacks: t.String(),
+    newtagsID: t.Array(t.Number()),
+    deletedtagsID: t.Array(t.Number()),
+    fieldIds: t.Array(t.Integer({ minimum: 1 })),
+    categoryIds: t.Array(t.Integer({ minimum: 1 })),
+    projectTypeIds: t.Array(t.Integer({ minimum: 1 })),
     updatedAt: t.Date(),
   })
 );
-
-export const ProjectTagPayloadSchema = t.Object({
-  projectID: t.Number(),
-  tagID: t.Number(),
-});
 
 export const ProjectMemberPayloadSchema = t.Object({
   projectID: t.Number(),
@@ -193,7 +210,6 @@ export type ProjectUpdatePayload = Static<typeof ProjectUpdatePayloadSchema> & {
   thumbnailMedia?: StoredImageMedia;
   galleryMedia?: Array<StoredImageMedia & { sortOrder: number }>;
 };
-export type ProjectTagPayload = Static<typeof ProjectTagPayloadSchema>;
 export type ProjectMemberPayload = Static<typeof ProjectMemberPayloadSchema>;
 export type ProjectCoursePayload = Static<typeof ProjectCoursePayloadSchema>;
 export type ProjectIdParam = Static<typeof ProjectIdParam>;

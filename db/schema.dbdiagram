@@ -1,0 +1,1013 @@
+{
+  "version": "3.0.0",
+  "darkMode": true,
+  "gridEnabling": false,
+  "currentViewName": null,
+  "defaultView": {
+    "detailLevel": "All",
+    "relationshipMode": "All",
+    "tablePositions": [
+      {
+        "name": "users",
+        "schemaName": "public",
+        "x": 952.9375,
+        "y": 53
+      },
+      {
+        "name": "users",
+        "schemaName": "auth",
+        "x": 1699.05615234375,
+        "y": 12
+      },
+      {
+        "name": "auth_sessions",
+        "schemaName": "auth",
+        "x": 2407.4033203125,
+        "y": 12
+      },
+      {
+        "name": "auth_accounts",
+        "schemaName": "auth",
+        "x": 2407.4033203125,
+        "y": 346
+      },
+      {
+        "name": "auth_verifications",
+        "schemaName": "auth",
+        "x": 12,
+        "y": 12
+      },
+      {
+        "name": "prefixes",
+        "schemaName": "public",
+        "x": 333.85986328125,
+        "y": 12
+      },
+      {
+        "name": "students",
+        "schemaName": "public",
+        "x": 2407.4033203125,
+        "y": 840
+      },
+      {
+        "name": "professors",
+        "schemaName": "public",
+        "x": 1699.05615234375,
+        "y": 314
+      },
+      {
+        "name": "roles",
+        "schemaName": "public",
+        "x": 333.85986328125,
+        "y": 282
+      },
+      {
+        "name": "permissions",
+        "schemaName": "public",
+        "x": 333.85986328125,
+        "y": 456
+      },
+      {
+        "name": "user_roles",
+        "schemaName": "public",
+        "x": 1699.05615234375,
+        "y": 744
+      },
+      {
+        "name": "role_permissions",
+        "schemaName": "public",
+        "x": 952.9375,
+        "y": 643
+      },
+      {
+        "name": "image_media",
+        "schemaName": "public",
+        "x": 333.85986328125,
+        "y": 726
+      },
+      {
+        "name": "news_categories",
+        "schemaName": "public",
+        "x": 333.85986328125,
+        "y": 1156
+      },
+      {
+        "name": "news",
+        "schemaName": "public",
+        "x": 1699.05615234375,
+        "y": 2178
+      },
+      {
+        "name": "news_images",
+        "schemaName": "public",
+        "x": 2407.4033203125,
+        "y": 1334
+      },
+      {
+        "name": "news_bulletins",
+        "schemaName": "public",
+        "x": 2407.4033203125,
+        "y": 1732
+      },
+      {
+        "name": "curriculums",
+        "schemaName": "public",
+        "x": 952.9375,
+        "y": 913
+      },
+      {
+        "name": "class_books",
+        "schemaName": "public",
+        "x": 1699.05615234375,
+        "y": 1014
+      },
+      {
+        "name": "course_types",
+        "schemaName": "public",
+        "x": 333.85986328125,
+        "y": 1330
+      },
+      {
+        "name": "courses",
+        "schemaName": "public",
+        "x": 1699.05615234375,
+        "y": 2736
+      },
+      {
+        "name": "prerequisites",
+        "schemaName": "public",
+        "x": 2407.4033203125,
+        "y": 2002
+      },
+      {
+        "name": "projects",
+        "schemaName": "public",
+        "x": 952.9375,
+        "y": 1376
+      },
+      {
+        "name": "project_members",
+        "schemaName": "public",
+        "x": 1699.05615234375,
+        "y": 1508
+      },
+      {
+        "name": "categories",
+        "schemaName": "public",
+        "x": 333.85986328125,
+        "y": 1504
+      },
+      {
+        "name": "project_categories",
+        "schemaName": "public",
+        "x": 1699.05615234375,
+        "y": 3198
+      },
+      {
+        "name": "project_types",
+        "schemaName": "public",
+        "x": 333.85986328125,
+        "y": 1646
+      },
+      {
+        "name": "project_project_types",
+        "schemaName": "public",
+        "x": 1699.05615234375,
+        "y": 3372
+      },
+      {
+        "name": "fields",
+        "schemaName": "public",
+        "x": 333.85986328125,
+        "y": 1788
+      },
+      {
+        "name": "project_fields",
+        "schemaName": "public",
+        "x": 1699.05615234375,
+        "y": 3546
+      },
+      {
+        "name": "tech_stacks",
+        "schemaName": "public",
+        "x": 333.85986328125,
+        "y": 1930
+      },
+      {
+        "name": "project_tech_stacks",
+        "schemaName": "public",
+        "x": 1699.05615234375,
+        "y": 3720
+      },
+      {
+        "name": "project_images",
+        "schemaName": "public",
+        "x": 1699.05615234375,
+        "y": 1875
+      },
+      {
+        "name": "tag_groups",
+        "schemaName": "public",
+        "x": 333.85986328125,
+        "y": 2072
+      },
+      {
+        "name": "tags",
+        "schemaName": "public",
+        "x": 952.9375,
+        "y": 2136
+      },
+      {
+        "name": "news_features",
+        "schemaName": "public",
+        "x": 2407.4033203125,
+        "y": 2272
+      },
+      {
+        "name": "news_additional_images",
+        "schemaName": "public",
+        "x": 2407.4033203125,
+        "y": 2638
+      },
+      {
+        "name": "type_courses",
+        "schemaName": "public",
+        "x": 333.85986328125,
+        "y": 2214
+      },
+      {
+        "name": "pre_courses",
+        "schemaName": "public",
+        "x": 2407.4033203125,
+        "y": 2908
+      },
+      {
+        "name": "project_tags",
+        "schemaName": "public",
+        "x": 1699.05615234375,
+        "y": 3894
+      },
+      {
+        "name": "project_courses",
+        "schemaName": "public",
+        "x": 2407.4033203125,
+        "y": 3178
+      }
+    ],
+    "tableGroupCollapseStates": [],
+    "stickyNoteLayouts": [],
+    "referencePaths": [
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "prefixes",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "prefix_id"
+        ],
+        "secondTableName": "users",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "image_media",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "image_id"
+        ],
+        "secondTableName": "users",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "id"
+        ],
+        "secondTableName": "users",
+        "secondSchemaName": "auth",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "auth",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "auth_sessions",
+        "secondSchemaName": "auth",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "auth",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "auth_accounts",
+        "secondSchemaName": "auth",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "students",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "class_books",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "class_book_id"
+        ],
+        "secondTableName": "students",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "class_books",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "classbook_id"
+        ],
+        "secondTableName": "students",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "professors",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "user_roles",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "roles",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "role_id"
+        ],
+        "secondTableName": "user_roles",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "roles",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "role_id"
+        ],
+        "secondTableName": "role_permissions",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "permissions",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "permission_id"
+        ],
+        "secondTableName": "role_permissions",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "tags",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "tag_id"
+        ],
+        "secondTableName": "news",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "news_categories",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "news_category_id"
+        ],
+        "secondTableName": "news",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "news",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "news_id"
+        ],
+        "secondTableName": "news_images",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "image_media",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "image_id"
+        ],
+        "secondTableName": "news_images",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "news",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "news_id"
+        ],
+        "secondTableName": "news_bulletins",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "image_media",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "image_id"
+        ],
+        "secondTableName": "curriculums",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "curriculums",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "curriculum_id"
+        ],
+        "secondTableName": "class_books",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "image_media",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "image_id"
+        ],
+        "secondTableName": "class_books",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "course_types",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "course_type_id"
+        ],
+        "secondTableName": "courses",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "type_courses",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "type_course_id"
+        ],
+        "secondTableName": "courses",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "curriculums",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "curriculum_id"
+        ],
+        "secondTableName": "courses",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "courses",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "course_id"
+        ],
+        "secondTableName": "prerequisites",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "courses",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "prerequisite_course_id"
+        ],
+        "secondTableName": "prerequisites",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "image_media",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "image_id"
+        ],
+        "secondTableName": "projects",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "projects",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "project_id"
+        ],
+        "secondTableName": "project_members",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "project_members",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "roles",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "role_id"
+        ],
+        "secondTableName": "project_members",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "projects",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "project_id"
+        ],
+        "secondTableName": "project_categories",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "categories",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "category_id"
+        ],
+        "secondTableName": "project_categories",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "projects",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "project_id"
+        ],
+        "secondTableName": "project_project_types",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "project_types",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "type_id"
+        ],
+        "secondTableName": "project_project_types",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "projects",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "project_id"
+        ],
+        "secondTableName": "project_fields",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "fields",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "field_id"
+        ],
+        "secondTableName": "project_fields",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "projects",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "project_id"
+        ],
+        "secondTableName": "project_tech_stacks",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "tech_stacks",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "tech_stack_id"
+        ],
+        "secondTableName": "project_tech_stacks",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "projects",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "project_id"
+        ],
+        "secondTableName": "project_images",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "image_media",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "image_id"
+        ],
+        "secondTableName": "project_images",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "tag_groups",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "tage_groups_id"
+        ],
+        "secondTableName": "tags",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "news",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "news_id"
+        ],
+        "secondTableName": "news_features",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "tags",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "tag_id"
+        ],
+        "secondTableName": "news_features",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "news",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "news_id"
+        ],
+        "secondTableName": "news_additional_images",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "courses",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "course_id"
+        ],
+        "secondTableName": "pre_courses",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "courses",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "pre_course_id"
+        ],
+        "secondTableName": "pre_courses",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "projects",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "project_id"
+        ],
+        "secondTableName": "project_tags",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "tags",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "tag_id"
+        ],
+        "secondTableName": "project_tags",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "projects",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "project_id"
+        ],
+        "secondTableName": "project_courses",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "courses",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "course_id"
+        ],
+        "secondTableName": "project_courses",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      }
+    ]
+  },
+  "views": {}
+}

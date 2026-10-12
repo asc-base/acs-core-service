@@ -4,11 +4,13 @@ import { executeSeedTags } from "./tag";
 import { excuteSeedTypeCourses } from "./type-course";
 import { executeSeedPrefixes } from "./prefix";
 import { syncNewsCategories } from "../../src/infrastructure/sync-news-categories";
+import { syncProjectClassifications } from "../../src/infrastructure/sync-project-classifications";
 
 async function main() {
   await excuteSeedRoles(prisma);
   await executeSeedTags(prisma);
   await syncNewsCategories(prisma);
+  await syncProjectClassifications(prisma);
   await excuteSeedTypeCourses(prisma);
   await executeSeedPrefixes(prisma);
 }

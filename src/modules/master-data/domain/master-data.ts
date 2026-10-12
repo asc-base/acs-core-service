@@ -14,6 +14,9 @@ export const MasterData = t.Intersect([
     tags: t.Array(Tag),
     prefixes: t.Array(PrefixSchema),
     newsCategories: t.Array(NewsCategorySchema),
+    fields: t.Array(t.Object({ id: t.Number(), name: t.String() })),
+    categories: t.Array(t.Object({ id: t.Number(), name: t.String() })),
+    projectTypes: t.Array(t.Object({ id: t.Number(), name: t.String() })),
   }),
 ]);
 

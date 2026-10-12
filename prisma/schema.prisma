@@ -553,6 +553,9 @@ model Project {
   updatedAt       DateTime        @updatedAt @map("updated_at")
   deletedAt       DateTime?       @map("deleted_at")
   projectTags     ProjectTag[]
+  projectFields   ProjectField[]
+  projectCategories ProjectCategory[]
+  projectProjectTypes ProjectProjectType[]
   projectMembers  ProjectMember[]
   projectCourses  ProjectCourse[]
   imageMedia      ImageMedia?     @relation(fields: [imageID], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -592,6 +595,75 @@ model ProjectTag {
 
   @@unique([projectID, tagID])
   @@map("project_tags")
+  @@schema("public")
+}
+
+model Field {
+  id       Int            @id @default(autoincrement()) @map("id")
+  name     String         @unique @map("name")
+  projects ProjectField[]
+
+  @@map("fields")
+  @@schema("public")
+}
+
+model ProjectField {
+  id        Int       @id @default(autoincrement()) @map("id")
+  projectID Int       @map("project_id")
+  fieldID   Int       @map("field_id")
+  project   Project   @relation(fields: [projectID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  field     Field     @relation(fields: [fieldID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([projectID])
+  @@index([fieldID])
+  @@unique([projectID, fieldID])
+  @@map("project_fields")
+  @@schema("public")
+}
+
+model Category {
+  id       Int                 @id @default(autoincrement()) @map("id")
+  name     String              @unique @map("name")
+  projects ProjectCategory[]
+
+  @@map("categories")
+  @@schema("public")
+}
+
+model ProjectCategory {
+  id         Int       @id @default(autoincrement()) @map("id")
+  projectID  Int       @map("project_id")
+  categoryID Int       @map("category_id")
+  project    Project   @relation(fields: [projectID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  category   Category  @relation(fields: [categoryID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([projectID])
+  @@index([categoryID])
+  @@unique([projectID, categoryID])
+  @@map("project_categories")
+  @@schema("public")
+}
+
+model ProjectType {
+  id       Int                   @id @default(autoincrement()) @map("id")
+  name     String                @unique @map("name")
+  projects ProjectProjectType[]
+
+  @@map("project_types")
+  @@schema("public")
+}
+
+model ProjectProjectType {
+  id        Int         @id @default(autoincrement()) @map("id")
+  projectID Int         @map("project_id")
+  typeID    Int         @map("type_id")
+  project   Project     @relation(fields: [projectID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  type      ProjectType @relation(fields: [typeID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([projectID])
+  @@index([typeID])
+  @@unique([projectID, typeID])
+  @@map("project_project_types")
   @@schema("public")
 }
 
