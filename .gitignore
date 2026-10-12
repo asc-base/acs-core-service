@@ -50,3 +50,4 @@ databasepg/
 /.agents
 
 .scratch
+/src/generated/prismabox
