@@ -6,11 +6,11 @@ import { ClassBookRepository } from "../../src/infrastructure/class-book.reposit
 import { ProjectService } from "../../src/modules/projects/project.service";
 import type { IProjectRepository } from "../../src/modules/projects/domain/project.repository";
 import type { IProjectFactory } from "../../src/modules/projects/project.factory";
-import type { CreateProjectDTO, Project } from "../../src/modules/projects/domain/project";
+import type { CreateProjectDTO } from "../../src/modules/projects/domain/project";
 import type { ProfileImageStorage } from "../../src/infrastructure/profile-image-storage";
 
 const cover = {
-  provider: "rustfs",
+  provider: "rustfs" as const,
   bucket: "acs-media",
   fileKey: "public/projects/images/cover",
   imageUrl: "https://acs.example/media/acs-media/public/projects/images/cover",
@@ -19,83 +19,143 @@ const cover = {
   fileSize: 4,
 };
 
-describe("central media owner writes", () => {
-  test("uploads Project images to central media and cleans them up if the owner write fails", async () => {
-    const bytes = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64"));
-    const image = () => new File([bytes], "project.png", { type: "image/png" });
+const image = () => {
+  const bytes = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64"));
+  return new File([bytes], "project.png", { type: "image/png" });
+};
+
+const projectInput: CreateProjectDTO = {
+  title: "Project",
+  detail: "Details",
+  githubURL: "https://example.test/github",
+  presentationURL: "https://example.test/presentation",
+  documentURL: "https://example.test/document",
+  youtubeURL: "https://example.test/youtube",
+  courseIds: [4],
+  fieldIds: [1],
+  categoryIds: [2],
+  projectTypeIds: [3],
+  members: [
+    { userID: 11, memberType: "STUDENT", position: "Backend" },
+    { userID: 12, memberType: "ADVISOR" },
+  ],
+  gallery: [{ fileIndex: 0 }],
+  techStacks: ["TypeScript"],
+};
+
+describe("central media writes for projects", () => {
+  test("cleans up uploaded images when the single project transaction fails", async () => {
     let nextID = 0;
     const storage = {
       provider: "rustfs" as const,
-      upload: vi.fn(async () => {
-        const id = ++nextID;
-        return { provider: "rustfs" as const, bucket: "acs-media", fileKey: `public/projects/images/${id}`, imageUrl: `https://acs.example/${id}` };
-      }),
+      upload: vi.fn(async () => ({ ...cover, fileKey: `public/projects/images/${++nextID}`, imageUrl: `https://acs.example/${nextID}` })),
       delete: vi.fn(async () => {}),
     } satisfies ProfileImageStorage;
-    const createProject = vi.fn(async (): Promise<Project> => { throw new Error("database failed"); });
-    const repository = { createProject } as unknown as IProjectRepository;
-    const factory = {} as unknown as IProjectFactory;
-    const service = new ProjectService(repository, storage, factory);
-    const data = {
-      thumbnailFile: image(),
-      title: "Project",
-      details: "Details",
-      githubURL: "",
-      presentationURL: "",
-      documentURL: "",
-      youtubeURL: "",
-      fieldIds: [],
-      categoryIds: [],
-      projectTypeIds: [],
-      members: [],
-      coursesID: [],
-      assets: [image()],
-      techStacks: [],
-    } as CreateProjectDTO;
+    const repository = { createProject: vi.fn().mockRejectedValue(new Error("database failed")) } as unknown as IProjectRepository;
+    const service = new ProjectService(repository, storage, {} as IProjectFactory);
 
-    await expect(service.createProject(data)).rejects.toThrow("database failed");
+    await expect(service.createProject(projectInput, { thumbnailFile: image(), assets: [image()] })).rejects.toThrow("database failed");
     expect(storage.upload).toHaveBeenCalledTimes(2);
-    expect(storage.upload).toHaveBeenCalledWith(expect.any(File), "image/png", "projects/images");
-    expect(createProject).toHaveBeenCalledWith(expect.objectContaining({
+    expect(repository.createProject).toHaveBeenCalledWith(expect.objectContaining({
       thumbnailMedia: expect.objectContaining({ contentType: "image/png", fileName: "project.png" }),
-      galleryMedia: [expect.objectContaining({ contentType: "image/png", fileName: "project.png", sortOrder: 0 })],
+      galleryImages: [expect.objectContaining({ media: expect.objectContaining({ contentType: "image/png", fileName: "project.png" }) })],
     }));
     expect(storage.delete).toHaveBeenCalledTimes(2);
   });
 
-  test("creates a Project and its ordered gallery relations in one transaction", async () => {
+  test("cleans up completed uploads when a later gallery upload fails", async () => {
+    let attempts = 0;
+    const storage = {
+      provider: "rustfs" as const,
+      upload: vi.fn(async () => {
+        attempts += 1;
+        if (attempts === 2) throw new Error("storage unavailable");
+        return cover;
+      }),
+      delete: vi.fn(async () => {}),
+    } satisfies ProfileImageStorage;
+    const repository = { createProject: vi.fn() } as unknown as IProjectRepository;
+    const service = new ProjectService(repository, storage, {} as IProjectFactory);
+
+    await expect(service.createProject(projectInput, { thumbnailFile: image(), assets: [image()] })).rejects.toThrow("storage unavailable");
+    expect(storage.upload).toHaveBeenCalledTimes(2);
+    expect(storage.delete).toHaveBeenCalledOnce();
+    expect(repository.createProject).not.toHaveBeenCalled();
+  });
+
+  test("rejects unreferenced gallery files before uploading media", async () => {
+    const storage = {
+      provider: "rustfs" as const,
+      upload: vi.fn(async () => cover),
+      delete: vi.fn(async () => {}),
+    } satisfies ProfileImageStorage;
+    const repository = { createProject: vi.fn() } as unknown as IProjectRepository;
+    const service = new ProjectService(repository, storage, {} as IProjectFactory);
+
+    await expect(service.createProject({ ...projectInput, gallery: [{ fileIndex: 1 }] }, {
+      thumbnailFile: image(),
+      assets: [image()],
+    })).rejects.toMatchObject({ statusCode: 400 });
+    expect(storage.upload).not.toHaveBeenCalled();
+  });
+
+  test("cleans up the thumbnail when a gallery file is not an image", async () => {
+    const storage = {
+      provider: "rustfs" as const,
+      upload: vi.fn(async () => cover),
+      delete: vi.fn(async () => {}),
+    } satisfies ProfileImageStorage;
+    const repository = { createProject: vi.fn() } as unknown as IProjectRepository;
+    const service = new ProjectService(repository, storage, {} as IProjectFactory);
+
+    await expect(service.createProject(projectInput, {
+      thumbnailFile: image(),
+      assets: [new File(["text file"], "bad.txt", { type: "text/plain" })],
+    })).rejects.toMatchObject({ statusCode: 415 });
+    expect(storage.upload).toHaveBeenCalledOnce();
+    expect(storage.delete).toHaveBeenCalledOnce();
+    expect(repository.createProject).not.toHaveBeenCalled();
+  });
+
+  test("writes project relations and ordered image links in one transaction", async () => {
     const tx = {
       imageMedia: { upsert: vi.fn().mockResolvedValueOnce({ id: 41 }).mockResolvedValueOnce({ id: 42 }) },
       project: { create: vi.fn().mockResolvedValue({ id: 7 }), findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 7 }) },
       projectField: { deleteMany: vi.fn(), createMany: vi.fn() },
       projectCategory: { deleteMany: vi.fn(), createMany: vi.fn() },
       projectProjectType: { deleteMany: vi.fn(), createMany: vi.fn() },
-      field: { findMany: vi.fn().mockResolvedValue([]) },
-      category: { findMany: vi.fn().mockResolvedValue([]) },
-      projectType: { findMany: vi.fn().mockResolvedValue([]) },
+      field: { count: vi.fn().mockResolvedValue(1) },
+      category: { count: vi.fn().mockResolvedValue(1) },
+      projectType: { count: vi.fn().mockResolvedValue(1) },
+      user: { findMany: vi.fn().mockResolvedValue([
+        { id: 11, student: { deletedAt: null }, professor: null },
+        { id: 12, student: null, professor: { deletedAt: null } },
+      ]) },
+      projectMember: { deleteMany: vi.fn(), createMany: vi.fn() },
+      course: { findMany: vi.fn().mockResolvedValue([{ id: 4 }]) },
+      projectCourse: { deleteMany: vi.fn(), createMany: vi.fn() },
+      techStack: { upsert: vi.fn().mockResolvedValue({ id: 51 }) },
+      projectTechStack: { deleteMany: vi.fn(), createMany: vi.fn() },
+      projectImage: { findMany: vi.fn().mockResolvedValue([]), deleteMany: vi.fn(), createMany: vi.fn() },
     };
     const db = { $transaction: vi.fn((work: (transaction: typeof tx) => unknown) => work(tx)) } as unknown as PrismaInstance;
     const repository = new ProjectRepository(db);
 
     await repository.createProject({
-      title: "Portal",
-      details: "Details",
-      githubURL: "",
-      presentationURL: "",
-      documentURL: "",
-      youtubeURL: "",
-      thumbnailURL: cover.imageUrl,
+      ...projectInput,
       thumbnailMedia: cover,
-      assetsURL: cover.imageUrl,
-      galleryMedia: [{ ...cover, sortOrder: 0 }],
-      techStacks: "",
+      galleryImages: [{ media: { ...cover, fileKey: "public/projects/images/gallery", imageUrl: "https://acs.example/gallery" } }],
     });
 
     expect(db.$transaction).toHaveBeenCalledOnce();
-    expect(tx.imageMedia.upsert).toHaveBeenCalledTimes(2);
-    expect(tx.project.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ imageID: 41, images: { create: [{ imageID: 42, sortOrder: 0 }] } }),
-    }));
+    expect(tx.project.create).toHaveBeenCalledWith({ data: expect.objectContaining({ imageID: 41, detail: "Details" }) });
+    expect(tx.projectMember.createMany).toHaveBeenCalledWith({ data: [
+      { projectID: 7, userID: 11, memberType: "STUDENT", position: "Backend" },
+      { projectID: 7, userID: 12, memberType: "ADVISOR", position: null },
+    ] });
+    expect(tx.projectCourse.createMany).toHaveBeenCalledWith({ data: [{ projectID: 7, courseID: 4 }] });
+    expect(tx.projectTechStack.createMany).toHaveBeenCalledWith({ data: [{ projectID: 7, techStackID: 51 }] });
+    expect(tx.projectImage.createMany).toHaveBeenCalledWith({ data: [{ projectID: 7, imageID: 42, sortOrder: 0 }] });
   });
 
   test("creates a Curriculum with its central thumbnail in one transaction", async () => {
@@ -106,14 +166,7 @@ describe("central media owner writes", () => {
     const db = { $transaction: vi.fn((work: (transaction: typeof tx) => unknown) => work(tx)) } as unknown as PrismaInstance;
     const repository = new CurriculumRepository(db);
 
-    await repository.createCurriculum({
-      title: "Curriculum",
-      year: "2026",
-      documentURL: "document.pdf",
-      description: "Description",
-      thumbnailURL: cover.imageUrl,
-      thumbnailMedia: cover,
-    });
+    await repository.createCurriculum({ title: "Curriculum", year: "2026", documentURL: "document.pdf", description: "Description", thumbnailURL: cover.imageUrl, thumbnailMedia: cover });
 
     expect(tx.imageMedia.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: cover }));
     expect(tx.curriculum.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ imageID: 51 }) }));
@@ -127,13 +180,7 @@ describe("central media owner writes", () => {
     const db = { $transaction: vi.fn((work: (transaction: typeof tx) => unknown) => work(tx)) } as unknown as PrismaInstance;
     const repository = new ClassBookRepository(db);
 
-    await repository.createClassBook({
-      classof: "2026",
-      firstYearAcademic: "2022",
-      curriculumID: 2,
-      thumbnailURL: cover.imageUrl,
-      thumbnailMedia: cover,
-    });
+    await repository.createClassBook({ classof: "2026", firstYearAcademic: "2022", curriculumID: 2, thumbnailURL: cover.imageUrl, thumbnailMedia: cover });
 
     expect(tx.imageMedia.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: cover }));
     expect(tx.classBook.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ imageID: 61 }) }));
