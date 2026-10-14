@@ -6,6 +6,7 @@ import { NewsCategoryPlain } from "../../../generated/prismabox/NewsCategory";
 import { FieldPlain } from "../../../generated/prismabox/Field";
 import { CategoryPlain } from "../../../generated/prismabox/Category";
 import { ProjectTypePlain } from "../../../generated/prismabox/ProjectType";
+import { TechStackPlain } from "../../../generated/prismabox/TechStack";
 
 export const MasterData = t.Intersect([
   t.Object({
@@ -16,6 +17,7 @@ export const MasterData = t.Intersect([
     fields: t.Array(FieldPlain),
     categories: t.Array(CategoryPlain),
     projectTypes: t.Array(ProjectTypePlain),
+    techStacks: t.Array(TechStackPlain),
   }),
 ]);
 

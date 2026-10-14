@@ -101,7 +101,7 @@ function readManifest() {
 }
 
 async function inventory() {
-  const [media, users, newsImages, curriculums, classBooks, projects, news, profiles, courseRows, cohortRows, projectRows, newsRows] = await Promise.all([
+  const [media, users, newsImages, curriculums, classBooks, projects, news, profiles, courseRows, cohortRows, newsRows] = await Promise.all([
     prisma.imageMedia.findMany({ select: { provider: true, imageUrl: true, contentType: true } }),
     prisma.user.count({ where: { imageUrl: { not: null }, imageID: null } }),
     prisma.newsImage.count(),
@@ -112,7 +112,6 @@ async function inventory() {
     selectedGroups.includes("profile") ? prisma.user.findMany({ where: { imageUrl: { not: null } }, select: { imageUrl: true } }) : [],
     selectedGroups.includes("curriculums") ? prisma.curriculum.findMany({ select: { thumbnailURL: true } }) : [],
     selectedGroups.includes("class-books") ? prisma.classBook.findMany({ select: { thumbnailURL: true } }) : [],
-    selectedGroups.includes("projects") ? prisma.project.findMany({ select: { thumbnailURL: true, assetsURL: true } }) : [],
     selectedGroups.includes("news") ? prisma.news.findMany({ include: { newsAdditionalImages: true } }) : [],
   ]);
   const urls = new Set(media.map(({ imageUrl }) => imageUrl));
@@ -120,7 +119,6 @@ async function inventory() {
     ...profiles.map(({ imageUrl }) => imageUrl).filter((url): url is string => Boolean(url)),
     ...courseRows.map((row) => row.thumbnailURL),
     ...cohortRows.map((row) => row.thumbnailURL),
-    ...projectRows.flatMap((row) => [row.thumbnailURL, ...(row.assetsURL ?? "").split(",").filter((url) => imageURL(url))]),
     ...newsRows.flatMap((row) => [row.thumbnail, ...row.newsAdditionalImages.map((image) => image.imageUrl)]).filter((url): url is string => Boolean(url)),
     ...media.map(({ imageUrl }) => imageUrl),
   ];
@@ -149,7 +147,7 @@ async function inventory() {
     existingNewsImageLinks: selectedGroups.includes("news") ? newsImages : "not selected",
     curriculumsNeedingLink: selectedGroups.includes("curriculums") ? curriculums : "not selected",
     classBooksNeedingLink: selectedGroups.includes("class-books") ? classBooks : "not selected",
-    projectsNeedingLink: selectedGroups.includes("projects") ? projects : "not selected",
+    projectsNeedingImageID: selectedGroups.includes("projects") ? projects : "not selected",
     sourceURLsOutsideAllowlist: blocked.map(safeDisplayURL),
     note: "Configure MEDIA_SOURCE_ALLOWED_ORIGINS before applying if source URLs need to be copied.",
   }, null, 2));
@@ -175,7 +173,7 @@ async function linkOwnerMedia() {
       });
     }
   }
-  for (const group of ["curriculums", "class-books", "projects"] as const) {
+  for (const group of ["curriculums", "class-books"] as const) {
     if (!selectedGroups.includes(group)) continue;
     if (group === "curriculums") {
       for (const row of await prisma.curriculum.findMany({ where: { imageID: null, thumbnailURL: { not: "" } } })) {
@@ -189,22 +187,6 @@ async function linkOwnerMedia() {
         await prisma.$transaction(async (tx) => {
           const imageID = await ensureImageMedia(tx, { provider: "legacy_url", imageUrl: row.thumbnailURL, fileName: fileName(row.thumbnailURL) });
           await tx.classBook.updateMany({ where: { id: row.id, imageID: null }, data: { imageID } });
-        });
-      }
-    } else {
-      for (const row of await prisma.project.findMany({ include: { images: true } })) {
-        await prisma.$transaction(async (tx) => {
-          const thumbnailID = await ensureImageMedia(tx, { provider: "legacy_url", imageUrl: row.thumbnailURL, fileName: fileName(row.thumbnailURL) });
-          if (row.imageID === null) await tx.project.updateMany({ where: { id: row.id, imageID: null }, data: { imageID: thumbnailID } });
-          const urls = (row.assetsURL ?? "").split(",").filter((url) => imageURL(url));
-          for (const [sortOrder, imageUrl] of urls.entries()) {
-            const imageID = await ensureImageMedia(tx, { provider: "legacy_url", imageUrl, fileName: fileName(imageUrl) });
-            await tx.projectImage.upsert({
-              where: { projectID_sortOrder: { projectID: row.id, sortOrder } },
-              create: { projectID: row.id, imageID, sortOrder, deletedAt: row.deletedAt },
-              update: {},
-            });
-          }
         });
       }
     }
@@ -228,9 +210,8 @@ async function verifyDestination(fileKey: string, expectedHash: string) {
 }
 
 async function ownersFor(imageID: number, imageUrl: string): Promise<ManifestRecord["owners"]> {
-  const [users, projects, curriculums, classBooks, news, additional] = await Promise.all([
+  const [users, curriculums, classBooks, news, additional] = await Promise.all([
     prisma.user.findMany({ where: { OR: [{ imageID }, { imageUrl }] }, select: { id: true, imageUrl: true } }),
-    prisma.project.findMany({ where: { OR: [{ imageID }, { thumbnailURL: imageUrl }, { assetsURL: { contains: imageUrl } }] }, select: { id: true, thumbnailURL: true, assetsURL: true } }),
     prisma.curriculum.findMany({ where: { OR: [{ imageID }, { thumbnailURL: imageUrl }] }, select: { id: true, thumbnailURL: true } }),
     prisma.classBook.findMany({ where: { OR: [{ imageID }, { thumbnailURL: imageUrl }] }, select: { id: true, thumbnailURL: true } }),
     prisma.news.findMany({ where: { thumbnail: imageUrl }, select: { id: true, thumbnail: true } }),
@@ -238,10 +219,6 @@ async function ownersFor(imageID: number, imageUrl: string): Promise<ManifestRec
   ]);
   return [
     ...users.filter((row) => row.imageUrl === imageUrl).map((row) => ({ table: "user", id: row.id, field: "imageUrl", before: imageUrl, after: "" })),
-    ...projects.flatMap((row) => [
-      ...(row.thumbnailURL === imageUrl ? [{ table: "project", id: row.id, field: "thumbnailURL", before: imageUrl, after: "" }] : []),
-      ...(row.assetsURL.split(",").includes(imageUrl) ? [{ table: "project", id: row.id, field: "assetsURL", before: row.assetsURL, after: "" }] : []),
-    ]),
     ...curriculums.filter((row) => row.thumbnailURL === imageUrl).map((row) => ({ table: "curriculum", id: row.id, field: "thumbnailURL", before: imageUrl, after: "" })),
     ...classBooks.filter((row) => row.thumbnailURL === imageUrl).map((row) => ({ table: "classBook", id: row.id, field: "thumbnailURL", before: imageUrl, after: "" })),
     ...news.map((row) => ({ table: "news", id: row.id, field: "thumbnail", before: row.thumbnail!, after: "" })),
@@ -318,10 +295,7 @@ async function migrateObjects() {
         state: "prepared", imageID: media.id, sourceUrl: media.imageUrl,
         source: { provider: media.provider, bucket: media.bucket, fileKey: media.fileKey, imageUrl: media.imageUrl, fileName: media.fileName, contentType: media.contentType, fileSize: media.fileSize },
         destination: { provider: "rustfs", bucket, fileKey, imageUrl: destinationUrl, fileName: originalFileName, contentType, fileSize: sourceBytes.length, sha256 },
-        owners: owners.map((owner) => {
-          if (owner.table === "project" && owner.field === "assetsURL") return { ...owner, after: owner.before.split(",").map((url) => url === media.imageUrl ? destinationUrl : url).join(",") };
-          return { ...owner, after: destinationUrl };
-        }),
+        owners: owners.map((owner) => ({ ...owner, after: destinationUrl })),
       };
       appendManifest(record);
       await prisma.$transaction(async (tx) => {
@@ -329,8 +303,6 @@ async function migrateObjects() {
         for (const owner of record.owners) {
           const where = { id: owner.id };
           if (owner.table === "user") await tx.user.updateMany({ where: { ...where, imageUrl: owner.before }, data: { imageUrl: owner.after } });
-          if (owner.table === "project" && owner.field === "thumbnailURL") await tx.project.updateMany({ where: { ...where, thumbnailURL: owner.before }, data: { thumbnailURL: owner.after } });
-          if (owner.table === "project" && owner.field === "assetsURL") await tx.project.updateMany({ where: { ...where, assetsURL: owner.before }, data: { assetsURL: owner.after } });
           if (owner.table === "curriculum") await tx.curriculum.updateMany({ where: { ...where, thumbnailURL: owner.before }, data: { thumbnailURL: owner.after } });
           if (owner.table === "classBook") await tx.classBook.updateMany({ where: { ...where, thumbnailURL: owner.before }, data: { thumbnailURL: owner.after } });
           if (owner.table === "news") await tx.news.updateMany({ where: { ...where, thumbnail: owner.before }, data: { thumbnail: owner.after } });
@@ -363,6 +335,10 @@ async function selectedMediaIDs() {
     for (const row of newsImages) ids.add(row.imageID);
     const legacyURLs = [...news.map((row) => row.thumbnail), ...additionalImages.map((row) => row.imageUrl)].filter((url): url is string => Boolean(url));
     if (legacyURLs.length) for (const row of await prisma.imageMedia.findMany({ where: { imageUrl: { in: legacyURLs } }, select: { id: true } })) ids.add(row.id);
+  }
+  if (selectedGroups.includes("projects")) {
+    for (const row of await prisma.project.findMany({ where: { imageID: { not: null } }, select: { imageID: true } })) if (row.imageID !== null) ids.add(row.imageID);
+    for (const row of await prisma.projectImage.findMany({ where: { deletedAt: null }, select: { imageID: true } })) ids.add(row.imageID);
   }
   if (selectedGroups.includes("projects")) {
     for (const row of await prisma.project.findMany({ where: { imageID: { not: null } }, select: { imageID: true } })) if (row.imageID !== null) ids.add(row.imageID);
@@ -435,19 +411,6 @@ async function rollbackManifest() {
       for (const owner of record.owners) {
         const where = { id: owner.id };
         if (owner.table === "user") await tx.user.updateMany({ where: { ...where, imageUrl: owner.after }, data: { imageUrl: owner.before } });
-        if (owner.table === "project" && owner.field === "thumbnailURL") await tx.project.updateMany({ where: { ...where, thumbnailURL: owner.after }, data: { thumbnailURL: owner.before } });
-        if (owner.table === "project" && owner.field === "assetsURL") {
-          const project = await tx.project.findUnique({ where, select: { assetsURL: true } });
-          if (project) {
-            const currentURLs = project.assetsURL.split(",");
-            if (currentURLs.includes(record.destination.imageUrl)) {
-              await tx.project.updateMany({
-                where: { ...where, assetsURL: project.assetsURL },
-                data: { assetsURL: currentURLs.map((url) => url === record.destination.imageUrl ? record.sourceUrl : url).join(",") },
-              });
-            }
-          }
-        }
         if (owner.table === "curriculum") await tx.curriculum.updateMany({ where: { ...where, thumbnailURL: owner.after }, data: { thumbnailURL: owner.before } });
         if (owner.table === "classBook") await tx.classBook.updateMany({ where: { ...where, thumbnailURL: owner.after }, data: { thumbnailURL: owner.before } });
         if (owner.table === "news") await tx.news.updateMany({ where: { ...where, thumbnail: owner.after }, data: { thumbnail: owner.before } });

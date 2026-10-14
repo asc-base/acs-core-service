@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { Elysia } from "elysia";
-import { t } from "elysia";
+import { Value } from "@sinclair/typebox/value";
 import { responseEnhancer } from "../../../src/core/interceptor/response";
 import { ProjectController } from "../../../src/modules/projects/project.controller";
 import { UpdateProjectDTO } from "../../../src/modules/projects/domain/project";
@@ -20,16 +20,15 @@ describe("project controller query contract", () => {
     },
   );
 
-  test("rejects retired tag fields in project payloads", async () => {
-    const app = new Elysia().put("/project/:id", ({ body }) => body, {
-      params: t.Object({ id: t.Numeric() }),
-      body: UpdateProjectDTO,
-    });
-    const response = await app.handle(new Request("http://localhost/project/7", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ tagsID: [16], newtagsID: [16], deletedtagsID: [16] }),
-    }));
-    expect(response.status).toBe(422);
+  test("validates the JSON relation payload and rejects removed fields", () => {
+    expect(Value.Check(UpdateProjectDTO, {
+      members: [{ userID: 7, memberType: "STUDENT", position: "Backend" }],
+      courseIds: [4],
+      gallery: [{ imageID: 12 }],
+    })).toBe(true);
+    expect(Value.Check(UpdateProjectDTO, {
+      details: "old field",
+      newMembers: [{ userID: 7, roleID: 2 }],
+    })).toBe(false);
   });
 });

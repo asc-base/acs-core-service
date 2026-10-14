@@ -10,4 +10,5 @@ export interface IMasterDataRepository {
   getFields(): Promise<Array<{ id: number; name: string }>>;
   getCategories(): Promise<Array<{ id: number; name: string }>>;
   getProjectTypes(): Promise<Array<{ id: number; name: string }>>;
+  getTechStacks(): Promise<Array<{ id: number; name: string }>>;
 }

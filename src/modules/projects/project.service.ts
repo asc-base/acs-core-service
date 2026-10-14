@@ -1,265 +1,174 @@
+import { AppError } from "../../core/error/app-error";
+import { ErrorCode } from "../../core/types/errors";
+import { HttpStatusCode } from "../../core/types/http";
+import { ProfileImageStorage, StoredImage } from "../../infrastructure/profile-image-storage";
+import { detectImageContentType } from "../users/image-file-validation";
+import type { StoredImageMedia } from "../users/domain/image-media";
 import { IProjectRepository } from "./domain/project.repository";
 import {
   CreateProjectDTO,
   ProjectDTO,
+  ProjectImageSource,
+  ProjectImageWrite,
   ProjectQueryParams,
   UpdateProjectDTO,
   ProjectCreatePayload,
   ProjectUpdatePayload,
-  ProjectMemberPayload,
-  ProjectCoursePayload,
 } from "./domain/project";
-import { ProfileImageStorage, StoredImage } from "../../infrastructure/profile-image-storage";
-import { detectImageContentType } from "../users/image-file-validation";
-import { AppError } from "../../core/error/app-error";
-import { ErrorCode } from "../../core/types/errors";
 import { IProjectFactory } from "./project.factory";
 import { PageableType } from "../../core/models";
-import { HttpStatusCode } from "../../core/types/http";
 
-interface IProjectService {
-  createProject(projectData: CreateProjectDTO): Promise<ProjectDTO>;
-  getProject(query: ProjectQueryParams): Promise<PageableType<typeof ProjectDTO>>;
-  getProjectById(id: number): Promise<ProjectDTO | null>;
-  updateProject(projectID: number, projectData: UpdateProjectDTO): Promise<ProjectDTO>;
-  deleteProject(id: number): Promise<ProjectDTO | null>;
+function validationError(message: string): never {
+  throw new AppError(ErrorCode.VALIDATION_ERROR, message, HttpStatusCode.BAD_REQUEST);
 }
 
-export class ProjectService implements IProjectService {
+function resolveGallery(sources: ProjectImageSource[], assets: File[]) {
+  const indexes = sources.flatMap((source) => "fileIndex" in source ? [source.fileIndex] : []);
+  if (new Set(indexes).size !== indexes.length || indexes.some((index) => index >= assets.length)) {
+    validationError("Gallery contains an invalid or duplicate asset index");
+  }
+  if (indexes.length !== assets.length || new Set(indexes).size !== assets.length) {
+    validationError("Every uploaded asset must appear once in the gallery");
+  }
+}
+
+function normalizeTechStacks(names: string[]) {
+  const cleanNames = names.map((name) => name.trim());
+  if (cleanNames.some((name) => !name)) validationError("Tech stack names cannot be blank");
+  return [...new Set(cleanNames)];
+}
+
+export class ProjectService {
   constructor(
     private readonly projectRepository: IProjectRepository,
     private readonly storageService: ProfileImageStorage,
     private readonly projectFactory: IProjectFactory,
-  ) { }
+  ) {}
 
-  async createProject(projectData: CreateProjectDTO): Promise<ProjectDTO> {
-    const {
-      thumbnailFile,
-      assets,
-      fieldIds,
-      categoryIds,
-      projectTypeIds,
-      techStacks,
-      members,
-      coursesID,
-      ...projectFields
-    } = projectData;
+  async createProject(
+    data: CreateProjectDTO,
+    files: { thumbnailFile?: File; assets?: File[] },
+  ): Promise<ProjectDTO> {
+    const thumbnailFile = files.thumbnailFile;
+    const assets = files.assets ?? [];
+    if (!thumbnailFile) validationError("Thumbnail file is required");
+    if (!assets.length || assets.length > 10) validationError("A project requires between 1 and 10 gallery images");
+    resolveGallery(data.gallery, assets);
 
     const uploadedMedia: StoredImage[] = [];
-    const assetURLs: string[] = [];
-
-    if (!thumbnailFile) {
-      throw new AppError(
-        ErrorCode.VALIDATION_ERROR,
-        "Thumbnail file is required",
-      );
-    }
-
-    if (assets.length === 0) {
-      throw new AppError(
-        ErrorCode.VALIDATION_ERROR,
-        "At least one asset file is required",
-      );
-    }
-
-    const thumbnailContentType = await detectImageContentType(thumbnailFile);
-    let thumbnailMedia: StoredImage;
-    let projectCreated = false;
+    let committed = false;
     try {
-      thumbnailMedia = await this.storageService.upload(thumbnailFile, thumbnailContentType, "projects/images");
-      uploadedMedia.push(thumbnailMedia);
-      const galleryMedia = [];
-      for (const asset of assets) {
-        const contentType = await detectImageContentType(asset);
-        const media = await this.storageService.upload(asset, contentType, "projects/images");
-        uploadedMedia.push(media);
-        galleryMedia.push({ ...media, fileName: asset.name, contentType, fileSize: asset.size, sortOrder: galleryMedia.length });
-        assetURLs.push(media.imageUrl);
-      }
-
-    const assetsURLString = assetURLs.join(",");
-    const techStackString = techStacks.join(",");
-
-      const createPayload: ProjectCreatePayload = {
-        ...projectFields,
-        thumbnailURL: thumbnailMedia.imageUrl,
-        thumbnailMedia: { ...thumbnailMedia, fileName: thumbnailFile.name, contentType: thumbnailContentType, fileSize: thumbnailFile.size },
-        galleryMedia,
-        assetsURL: assetsURLString,
-        techStacks: techStackString,
-        fieldIds,
-        categoryIds,
-        projectTypeIds,
+      const thumbnailMedia = await this.upload(thumbnailFile, uploadedMedia);
+      const galleryFiles: StoredImageMedia[] = [];
+      for (const asset of assets) galleryFiles.push(await this.upload(asset, uploadedMedia));
+      const payload: ProjectCreatePayload = {
+        ...data,
+        figmaURL: data.figmaURL ?? null,
+        techStacks: normalizeTechStacks(data.techStacks),
+        thumbnailMedia,
+        galleryImages: data.gallery.map(({ fileIndex }) => ({ media: galleryFiles[fileIndex]! })),
       };
-
-      const createdProject = await this.projectRepository.createProject(createPayload);
-      projectCreated = true;
-
-    const projectMembersData: ProjectMemberPayload[] = members.map((member) => ({
-      projectID: createdProject.id,
-      userID: member.userID,
-      roleID: member.roleID,
-    }));
-
-    const projectCourseData: ProjectCoursePayload[] = Array.from(new Set(coursesID)).map((courseID) => ({
-      projectID: createdProject.id,
-      courseID,
-    }));
-
-      await this.projectRepository.createProjectMember(projectMembersData);
-
-      await this.projectRepository.createProjectCourse(projectCourseData);
-
-      const completeProject = await this.projectRepository.getProjectById(createdProject.id);
-      if (!completeProject) throw new AppError(ErrorCode.NOT_FOUND_ERROR, "Project not found", 404);
-      return this.projectFactory.mapProjectToDTO(completeProject);
+      const project = await this.projectRepository.createProject(payload);
+      committed = true;
+      return this.projectFactory.mapProjectToDTO(project);
     } catch (error) {
-      if (!projectCreated) await Promise.all(uploadedMedia.map((media) => this.storageService.delete(media.bucket, media.fileKey).catch(() => {})));
+      if (!committed) await this.cleanupUploadedMedia(uploadedMedia);
       throw error;
     }
   }
 
   async getProject(query: ProjectQueryParams): Promise<PageableType<typeof ProjectDTO>> {
-    const [ProjectList, countProject] = await Promise.all([
+    const [projects, totalRecords] = await Promise.all([
       this.projectRepository.getProject(query),
       this.projectRepository.countProject(query),
     ]);
-
     return {
-      rows: this.projectFactory.mapProjectListToDTOList(ProjectList),
-      totalRecords: countProject,
-      page: query.page || 1,
-      pageSize: query.pageSize || 10,
+      rows: this.projectFactory.mapProjectListToDTOList(projects),
+      totalRecords,
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 10,
     };
   }
 
   async getProjectById(id: number): Promise<ProjectDTO | null> {
-    try {
-      const project = await this.projectRepository.getProjectById(id);
-      if (!project) {
-        return null;
-      }
-      return this.projectFactory.mapProjectToDTO(project);
-    } catch (error) {
-      if (error instanceof AppError && error.statusCode === 404) {
-        return null;
-      }
-      throw error;
-    }
+    const project = await this.projectRepository.getProjectById(id);
+    return project ? this.projectFactory.mapProjectToDTO(project) : null;
   }
 
-  async updateProject(id: number, projectData: UpdateProjectDTO): Promise<ProjectDTO> {
-    const {
-      thumbnailFile,
-      assets,
-      fieldIds,
-      categoryIds,
-      projectTypeIds,
-      techStacks,
-      newMembers = [],
-      deletedmembersID = [],
-      newCoursesID = [],
-      deletedCoursesID = [],
-      ...projectFields
-    } = projectData;
+  async updateProject(id: number, data: UpdateProjectDTO, files: { thumbnailFile?: File; assets?: File[] } = {}): Promise<ProjectDTO> {
     const existingProject = await this.projectRepository.getProjectById(id);
     if (!existingProject) {
-      throw new AppError(ErrorCode.NOT_FOUND, "Project not found");
+      throw new AppError(ErrorCode.NOT_FOUND_ERROR, "Project not found", HttpStatusCode.NOT_FOUND);
     }
+
+    const assets = files.assets ?? [];
+    if (assets.length > 10) validationError("A project cannot contain more than 10 gallery images");
+    if (data.gallery?.length === 0) {
+      validationError("A project requires at least one gallery image");
+    }
+    if (data.gallery !== undefined) resolveGallery(data.gallery, assets);
+    else if (assets.length) validationError("Gallery order is required when uploading assets");
 
     const uploadedMedia: StoredImage[] = [];
-    let mediaCommitted = false;
+    let committed = false;
     try {
-    let thumbnailURL = existingProject.imageMedia?.imageUrl ?? existingProject.thumbnailURL;
-    let thumbnailMedia: StoredImage | undefined;
-    let thumbnailContentType: string | undefined;
-
-    if (thumbnailFile) {
-      thumbnailContentType = await detectImageContentType(thumbnailFile);
-      thumbnailMedia = await this.storageService.upload(thumbnailFile, thumbnailContentType, "projects/images");
-      uploadedMedia.push(thumbnailMedia);
-      thumbnailURL = thumbnailMedia.imageUrl;
-    }
-
-    const assetURLs: string[] = existingProject.assetsURL
-      ? existingProject.assetsURL.split(",").filter(Boolean)
-      : [];
-
-    const galleryMedia = [];
-    if (assets && assets.length > 0) {
-      for (const asset of assets) {
-        const contentType = await detectImageContentType(asset);
-        const uploaded = await this.storageService.upload(asset, contentType, "projects/images");
-        uploadedMedia.push(uploaded);
-        galleryMedia.push({ ...uploaded, fileName: asset.name, contentType, fileSize: asset.size, sortOrder: assetURLs.length });
-        assetURLs.push(uploaded.imageUrl);
-      }
-    }
-
-    const assetsURLString = assetURLs.join(",");
-
-    const techStackString = techStacks
-      ? techStacks.join(",")
-      : existingProject.techStacks;
-
-    const updatedData: ProjectUpdatePayload = {
-      ...projectFields,
-      thumbnailURL,
-      assetsURL: assetsURLString,
-      ...(thumbnailMedia && { thumbnailMedia: { ...thumbnailMedia, fileName: thumbnailFile!.name, contentType: thumbnailContentType!, fileSize: thumbnailFile!.size } }),
-      ...(galleryMedia.length && { galleryMedia }),
-      techStacks: techStackString,
-      ...(fieldIds !== undefined && { fieldIds }),
-      ...(categoryIds !== undefined && { categoryIds }),
-      ...(projectTypeIds !== undefined && { projectTypeIds }),
-      updatedAt: new Date(),
-    }
-      await this.projectRepository.updateProject(id, updatedData);
-      mediaCommitted = true;
+      const thumbnailMedia = files.thumbnailFile
+        ? await this.upload(files.thumbnailFile, uploadedMedia)
+        : undefined;
+      const galleryFiles: StoredImageMedia[] = [];
+      for (const asset of assets) galleryFiles.push(await this.upload(asset, uploadedMedia));
+      const galleryImages: ProjectImageWrite[] | undefined = data.gallery?.map((source) =>
+        "imageID" in source
+          ? { imageID: source.imageID }
+          : { media: galleryFiles[source.fileIndex]! },
+      );
+      const payload: ProjectUpdatePayload = {
+        ...data,
+        ...(data.figmaURL !== undefined && { figmaURL: data.figmaURL }),
+        ...(data.techStacks !== undefined && { techStacks: normalizeTechStacks(data.techStacks) }),
+        ...(thumbnailMedia && { thumbnailMedia }),
+        ...(galleryImages && { galleryImages }),
+        updatedAt: new Date(),
+      };
+      const project = await this.projectRepository.updateProject(id, payload);
+      committed = true;
+      return this.projectFactory.mapProjectToDTO(project);
     } catch (error) {
-      if (!mediaCommitted) await Promise.all(uploadedMedia.map((media) => this.storageService.delete(media.bucket, media.fileKey).catch(() => {})));
+      if (!committed) await this.cleanupUploadedMedia(uploadedMedia);
       throw error;
     }
-
-    if (newMembers.length > 0) {
-      const data = newMembers.map((member) => ({
-        projectID: id,
-        userID: member.userID,
-        roleID: member.roleID,
-      }));
-      await this.projectRepository.createProjectMember(data);
-    }
-
-    if (deletedmembersID.length > 0) {
-      await this.projectRepository.deleteProjectMember(id, deletedmembersID);
-    }
-
-    if (newCoursesID.length > 0) {
-      const data = Array.from(new Set(newCoursesID)).map((courseID) => ({
-        projectID: id,
-        courseID,
-      }));
-      await this.projectRepository.createProjectCourse(data);
-    }
-
-    if (deletedCoursesID.length > 0) {
-      await this.projectRepository.deleteProjectCourse(id, deletedCoursesID);
-    }
-
-    const completeProject = await this.projectRepository.getProjectById(id);
-    if (!completeProject) throw new AppError(ErrorCode.NOT_FOUND_ERROR, "Project not found", 404);
-    return this.projectFactory.mapProjectToDTO(completeProject);
   }
 
-  async deleteProject(id: number): Promise<ProjectDTO | null> {
+  async deleteProject(id: number): Promise<ProjectDTO> {
     const project = await this.projectRepository.deleteProject(id);
-    if (!project) {
-      throw new AppError(
-        ErrorCode.NOT_FOUND_ERROR,
-        "Project not found",
-        HttpStatusCode.NOT_FOUND,
-      );
-    }
     return this.projectFactory.mapProjectToDTO(project);
+  }
+
+  private async upload(file: File, uploadedMedia: StoredImage[]) {
+    const contentType = await detectImageContentType(file);
+    const media = await this.storageService.upload(file, contentType, "projects/images");
+    uploadedMedia.push(media);
+    return {
+      ...media,
+      fileName: file.name,
+      contentType,
+      fileSize: file.size,
+    };
+  }
+
+  private async cleanupUploadedMedia(media: StoredImage[]) {
+    const cleanupResults = await Promise.allSettled(
+      media.map((image) => this.storageService.delete(image.bucket, image.fileKey)),
+    );
+    cleanupResults.forEach((result, index) => {
+      if (result.status === "rejected") {
+        // Report failed cleanup so an operator can remove the orphaned storage object.
+        // eslint-disable-next-line no-console
+        console.error("Failed to remove project media after a failed write", {
+          imageUrl: media[index]?.imageUrl,
+          error: result.reason,
+        });
+      }
+    });
   }
 }

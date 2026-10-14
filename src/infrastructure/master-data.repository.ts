@@ -37,4 +37,8 @@ export class MasterDataRepository implements IMasterDataRepository {
     return this.prisma.projectType.findMany({ orderBy: { id: "asc" } });
   }
 
+  async getTechStacks() {
+    return this.prisma.techStack.findMany({ orderBy: { name: "asc" } });
+  }
+
 }

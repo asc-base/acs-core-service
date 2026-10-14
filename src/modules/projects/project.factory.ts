@@ -1,6 +1,7 @@
 import { Project, ProjectDTO } from "./domain/project";
 import { IUserFactory } from "../users/user.factory";
 import { ICourseFactory } from "../courses/course.factory";
+
 export interface IProjectFactory {
   mapProjectToDTO(project: Project): ProjectDTO;
   mapProjectListToDTOList(projects: Project[]): ProjectDTO[];
@@ -11,46 +12,42 @@ export class ProjectFactory implements IProjectFactory {
     private readonly userFactory: IUserFactory,
     private readonly courseFactory: ICourseFactory,
   ) {}
+
   mapProjectToDTO(project: Project): ProjectDTO {
     return {
       id: project.id,
-      thumbnailURL: project.imageMedia?.imageUrl ?? project.thumbnailURL,
-      thumbnailContentType: project.imageMedia?.contentType ?? null,
       title: project.title,
+      detail: project.detail,
+      thumbnailURL: project.imageMedia?.imageUrl ?? "",
+      thumbnailContentType: project.imageMedia?.contentType ?? null,
+      imageID: project.imageID,
       thumbnailFocalPointX: project.thumbnailFocalPointX,
       thumbnailFocalPointY: project.thumbnailFocalPointY,
-      details: project.details,
       githubURL: project.githubURL,
       presentationURL: project.presentationURL,
       documentURL: project.documentURL,
-      figmaURL: project.figmaURL ?? undefined,
+      figmaURL: project.figmaURL,
       youtubeURL: project.youtubeURL,
-      assetsURL: project.assetsURL ? project.assetsURL.split(",") : [],
-      images: (project.images ?? []).map(({ sortOrder, image }) => ({
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+      deletedAt: project.deletedAt,
+      images: project.images.map(({ imageID, sortOrder, image }) => ({
+        imageID,
         imageUrl: image.imageUrl,
-        contentType: image.contentType ?? null,
+        contentType: image.contentType,
         sortOrder,
       })),
-      techStacks: project.techStacks ? project.techStacks.split(",") : [],
-
-      fields: (project.projectFields ?? []).map(({ field }) => field),
-      categories: (project.projectCategories ?? []).map(
-        ({ category }) => category,
-      ),
-      projectTypes: (project.projectProjectTypes ?? []).map(({ type }) => type),
-
-      member:
-        project.projectMembers?.map((projectMember) => ({
-          ...this.userFactory.mapUserToDTO(projectMember.user),
-          role: {
-            id: projectMember.role.id,
-            name: projectMember.role.name,
-          },
-        })) ?? [],
-
-      course: this.courseFactory.mapCourseListToDTO(
-        project.projectCourses?.map((projectCourse) => projectCourse.course) ||
-          [],
+      techStacks: project.projectTechStacks.map(({ techStack }) => techStack),
+      fields: project.projectFields.map(({ field }) => field),
+      categories: project.projectCategories.map(({ category }) => category),
+      projectTypes: project.projectProjectTypes.map(({ type }) => type),
+      members: project.projectMembers.map(({ user, memberType, position }) => ({
+        user: this.userFactory.mapUserToDTO(user),
+        memberType,
+        position,
+      })),
+      courses: this.courseFactory.mapCourseListToDTO(
+        project.projectCourses.map(({ course }) => course),
       ),
     };
   }

@@ -30,7 +30,6 @@ model Role {
   id             Int             @id @default(autoincrement()) @map("id")
   name           String          @unique @map("name")
   userRoles      UserRole[]
-  projectMembers ProjectMember[]
 
   @@map("roles")
   @@schema("public")
@@ -504,13 +503,10 @@ view UserProfessorView {
 model Project {
   id              Int             @id @default(autoincrement()) @map("id")
   title           String          @map("title")
-  thumbnailURL    String          @map("thumbnail_url")
   imageID         Int?            @map("image_id")
   thumbnailFocalPointX Float?     @map("thumbnail_focal_point_x")
   thumbnailFocalPointY Float?     @map("thumbnail_focal_point_y")
-  assetsURL       String          @map("assets_url")
-  techStacks      String          @map("tech_stacks")
-  details         String          @map("details")
+  detail          String?         @map("detail")
   githubURL       String          @map("github_url")
   presentationURL String          @map("presentation_url")
   documentURL     String          @map("document_url")
@@ -524,6 +520,7 @@ model Project {
   projectProjectTypes ProjectProjectType[]
   projectMembers  ProjectMember[]
   projectCourses  ProjectCourse[]
+  projectTechStacks ProjectTechStack[]
   imageMedia      ImageMedia?     @relation(fields: [imageID], references: [id], onDelete: SetNull, onUpdate: Cascade)
   images          ProjectImage[]
 
@@ -545,6 +542,29 @@ model ProjectImage {
   @@unique([projectID, sortOrder])
   @@index([imageID])
   @@map("project_images")
+  @@schema("public")
+}
+
+model TechStack {
+  id       Int               @id @default(autoincrement()) @map("id")
+  name     String            @unique @map("name")
+  projects ProjectTechStack[]
+
+  @@map("tech_stacks")
+  @@schema("public")
+}
+
+model ProjectTechStack {
+  id          Int       @id @default(autoincrement()) @map("id")
+  projectID   Int       @map("project_id")
+  techStackID Int       @map("tech_stack_id")
+  project     Project   @relation(fields: [projectID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  techStack   TechStack @relation(fields: [techStackID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([projectID])
+  @@index([techStackID])
+  @@unique([projectID, techStackID])
+  @@map("project_tech_stacks")
   @@schema("public")
 }
 
@@ -621,17 +641,26 @@ model ProjectMember {
   id        Int       @id @default(autoincrement()) @map("id")
   projectID Int       @map("project_id")
   userID    Int       @map("user_id")
-  roleID    Int       @map("role_id")
+  memberType ProjectMemberType @map("member_type")
+  position  String?   @map("position")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
   project Project @relation(fields: [projectID], references: [id])
   user    User    @relation(fields: [userID], references: [id])
-  role    Role    @relation(fields: [roleID], references: [id])
 
   @@unique([projectID, userID])
   @@map("project_members")
+  @@schema("public")
+}
+
+enum ProjectMemberType {
+  STUDENT
+  ADVISOR
+  CO_ADVISOR
+
+  @@map("project_member_type")
   @@schema("public")
 }
 
