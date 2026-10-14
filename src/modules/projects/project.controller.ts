@@ -22,12 +22,14 @@ const imageStorage = createCentralImageStorage();
 const projectFactory = new ProjectFactory(new UserFactory(), new CourseFactory());
 const projectService = new ProjectService(projectRepository, imageStorage, projectFactory);
 
-function readPayload<Schema extends TSchema>(schema: Schema, raw: string): Static<Schema> {
-  let value: unknown;
-  try {
-    value = JSON.parse(raw);
-  } catch {
-    throw new AppError(ErrorCode.VALIDATION_ERROR, "Project payload must be valid JSON", 400);
+function readPayload<Schema extends TSchema>(schema: Schema, raw: unknown): Static<Schema> {
+  let value = raw;
+  if (typeof raw === "string") {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, "Project payload must be valid JSON", 400);
+    }
   }
   if (!Value.Check(schema, value)) {
     const error = Value.Errors(schema, value).First();
