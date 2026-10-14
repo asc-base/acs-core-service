@@ -82,14 +82,19 @@ export const UpdateProjectDTO = t.Object(
   { additionalProperties: false },
 );
 
+const ProjectPayloadInput = t.Union([
+  t.String(),
+  t.Record(t.String(), t.Unknown()),
+]);
+
 export const ProjectMultipartBody = t.Object({
-  payload: t.String(),
+  payload: ProjectPayloadInput,
   thumbnailFile: t.Optional(t.File()),
   assets: t.Optional(t.Files()),
 });
 
 export const CreateProjectMultipartBody = t.Object({
-  payload: t.String(),
+  payload: ProjectPayloadInput,
   thumbnailFile: t.File(),
   assets: t.Files(),
 });
