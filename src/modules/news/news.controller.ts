@@ -4,7 +4,7 @@ import { NewsRepository } from "../../infrastructure/news.repository";
 import { prisma } from "../../lib/db";
 import { NewsService } from "./news.service";
 import { NewsDocs } from "./news.docs";
-import { success } from "../../core/interceptor/response";
+import { mapResponse, success } from "../../core/interceptor/response";
 import { NewsFactory } from "./news.factory";
 import { createNewsImageStorage } from "../../infrastructure/profile-image-storage";
 import { HttpStatusCode } from "../../core/types/http";
@@ -12,6 +12,7 @@ import { authMiddleware } from "../../middleware/auth";
 import { roleMacro } from "../../middleware/checkRole";
 import { PERMISSION } from "../../core/permission/permission";
 import { AppError } from "../../core/error/app-error";
+import { NewsBulletinDTO } from "./domain/news";
 
 const newsRepository = new NewsRepository(prisma);
 const newsFactory = new NewsFactory();
@@ -98,7 +99,10 @@ export const createNewsController =
                   },
                   {
                     params: t.Object({ id: t.Numeric(), type: t.Union([t.Literal("HIGHLIGHT"), t.Literal("ANNOUNCEMENT")]) }),
-                    response: { 200: t.Any(), 404: t.Any() },
+                    response: {
+                      200: mapResponse(NewsBulletinDTO),
+                      404: mapResponse(t.Null()),
+                    },
                     checkRole: PERMISSION.ADMINPERSMISSION,
                   },
                 )
@@ -115,7 +119,10 @@ export const createNewsController =
                   },
                   {
                     params: t.Object({ id: t.Numeric(), type: t.Union([t.Literal("HIGHLIGHT"), t.Literal("ANNOUNCEMENT")]) }),
-                    response: { 200: t.Any(), 404: t.Any() },
+                    response: {
+                      200: mapResponse(t.Null()),
+                      404: mapResponse(t.Null()),
+                    },
                     checkRole: PERMISSION.ADMINPERSMISSION,
                   },
                 ),
@@ -129,7 +136,7 @@ export const createNewsController =
             },
             {
               query: t.Object({ type: t.Union([t.Literal("HIGHLIGHT"), t.Literal("ANNOUNCEMENT")]) }),
-              response: { 200: t.Any() },
+              response: { 200: mapResponse(t.Array(NewsBulletinDTO)) },
             },
           )
           .get(
