@@ -250,6 +250,7 @@ export const NewsImageViewSchema = t.Object({
 export const NewsCategoryViewSchema = NewsCategoryPlain;
 export const NewsBulletinDTO = t.Object({
   ...t.Pick(NewsBulletinPlain, ["id", "newsID", "type"]).properties,
+  imageUrl: t.Nullable(t.String()),
   news: NewsDTO,
 });
 

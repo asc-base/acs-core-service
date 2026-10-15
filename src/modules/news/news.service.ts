@@ -16,6 +16,7 @@ import {
   NewsBulletinType,
   NewsBulletinDTO,
 } from "./domain/news";
+import type { NewsBulletinView } from "./domain/news";
 import { INewsRepository } from "./domain/news.repository";
 import { NewsFactory } from "./news.factory";
 import { PageableType } from "../../core/models";
@@ -34,6 +35,25 @@ export class NewsService implements INewsService {
     private readonly newsFactory: NewsFactory,
     private readonly storageService: ProfileImageStorage,
   ) { }
+
+  private mapNewsBulletinToDTO(
+    bulletin: NewsBulletinView,
+  ): Static<typeof NewsBulletinDTO> {
+    const { id, newsID, type, news } = bulletin;
+    const imageType = type === "HIGHLIGHT" ? "THUMBNAIL" : "CARD";
+    const imageUrl =
+      news.images?.find((image) => image.imageType === imageType)?.imageUrl ??
+      news.thumbnail;
+
+    return {
+      id,
+      newsID,
+      type,
+      imageUrl,
+      news: this.newsFactory.mapNewsToDTO(news),
+    };
+  }
+
   async createNews(
     data: CreateNewsDTO,
   ): Promise<NewsDTO> {
@@ -153,17 +173,13 @@ export class NewsService implements INewsService {
 
   async getNewsBulletins(type: NewsBulletinType): Promise<Array<Static<typeof NewsBulletinDTO>>> {
     const rows = await this.newsRepository.getNewsBulletins(type);
-    return rows.map(({ news, ...bulletin }) => ({
-      ...bulletin,
-      news: this.newsFactory.mapNewsToDTO(news),
-    }));
+    return rows.map((bulletin) => this.mapNewsBulletinToDTO(bulletin));
   }
 
   async setNewsBulletin(newsID: number, type: NewsBulletinType, enabled: boolean): Promise<Static<typeof NewsBulletinDTO> | null> {
     const row = await this.newsRepository.setNewsBulletin(newsID, type, enabled);
     if (!row) return null;
-    const { news, ...bulletin } = row;
-    return { ...bulletin, news: this.newsFactory.mapNewsToDTO(news) };
+    return this.mapNewsBulletinToDTO(row);
   }
 
   async deleteNews(id: number): Promise<NewsDTO | null> {

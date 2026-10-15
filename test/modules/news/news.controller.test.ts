@@ -7,6 +7,10 @@ import { createNewsController } from "../../../src/modules/news/news.controller"
 import type { NewsService } from "../../../src/modules/news/news.service";
 
 vi.mock("../../../src/lib/db", () => ({ prisma: {} }));
+vi.mock("../../../src/middleware/auth", () => ({
+  authMiddleware: (app: import("elysia").Elysia) =>
+    app.derive(() => ({ userID: 1, roles: ["admin"] })),
+}));
 
 const newsFixture = (): NewsDTO => ({
   id: 7,
@@ -56,14 +60,42 @@ describe("news read endpoints", () => {
   test("returns only bulletins of the requested type", async () => {
     const app = createApp({
       getNewsBulletins: async (type: "HIGHLIGHT" | "ANNOUNCEMENT") => [
-        { id: 3, newsID: 7, type, news: newsFixture() },
+        { id: 3, newsID: 7, type, imageUrl: "https://example.com/news.jpg", news: newsFixture() },
       ],
     } as unknown as NewsService);
     const response = await app.handle(new Request("http://localhost/news/bulletins?type=HIGHLIGHT"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.data).toMatchObject([{ type: "HIGHLIGHT", news: { category: { code: "ANNOUNCEMENT" } } }]);
+    expect(body.data).toMatchObject([{
+      type: "HIGHLIGHT",
+      imageUrl: "https://example.com/news.jpg",
+      news: { category: { code: "ANNOUNCEMENT" } },
+    }]);
+  });
+
+  test("returns the selected bulletin image when enabling it", async () => {
+    const bulletin = {
+      id: 3,
+      newsID: 7,
+      type: "HIGHLIGHT",
+      imageUrl: "https://example.com/thumbnail.jpg",
+      news: newsFixture(),
+    };
+    const app = createApp({
+      setNewsBulletin: async () => bulletin,
+    } as unknown as NewsService);
+    const response = await app.handle(new Request(
+      "http://localhost/news/7/bulletins/HIGHLIGHT",
+      { method: "PUT" },
+    ));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data).toMatchObject({
+      id: 3,
+      imageUrl: "https://example.com/thumbnail.jpg",
+    });
   });
 
   test("rejects legacy tag filters and returns 404 for the retired feature route", async () => {
