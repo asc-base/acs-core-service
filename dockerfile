@@ -1,3 +1,4 @@
+
 FROM oven/bun:1.3.10-alpine AS bun-base
 WORKDIR /usr/src/app
 
@@ -21,7 +22,7 @@ CMD [ "bun", "--watch", "src/index.ts" ]
 
 FROM local AS development
 
-FROM node:24-alpine AS node-base
+FROM node:24.22.1-alpine AS node-base
 WORKDIR /usr/src/app
 
 RUN apk add --no-cache netcat-openbsd openssl
