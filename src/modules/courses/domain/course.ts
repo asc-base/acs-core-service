@@ -53,6 +53,8 @@ export const CreateCourseDTO = t.Object({
 
 export const CourseQueryParams = t.Object({
   ...CommonQueryParams,
+  page: t.Optional(t.Numeric({ minimum: 1 })),
+  pageSize: t.Optional(t.Numeric({ minimum: 1 })),
   search: t.Optional(t.String()),
   typeCourseID: t.Optional(t.Number()),
   curriculumID: t.Optional(t.Number()),
