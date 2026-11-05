@@ -15,8 +15,8 @@ export const BaseModelSchema = t.Partial(
 export type BaseModel = Static<typeof BaseModelSchema>;
 
 export const CommonQueryParams = {
-  page: t.Optional(t.Numeric({ default: 1, minimum: 1, examples: [1] })),
-  pageSize: t.Optional(t.Numeric({ default: 10, minimum: 1, examples: [10] })),
+  page: t.Optional(t.Numeric({ minimum: 1, examples: [1] })),
+  pageSize: t.Optional(t.Numeric({ minimum: 1, examples: [10] })),
   orderBy: t.Optional(
     t.String({
       default: "createdAt",
