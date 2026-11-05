@@ -301,7 +301,7 @@ model Student {
 model Curriculum {
   id           Int         @id @default(autoincrement()) @map("id")
   title        String      @map("title")
-  year         String      @map("year")
+  year         String      @unique @map("year")
   documentURL  String      @map("document_url")
   description  String      @map("description")
   thumbnailURL String      @map("thumbnail_url")
