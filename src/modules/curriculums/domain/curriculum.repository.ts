@@ -5,6 +5,7 @@ export interface ICurriculumRepository {
   getCurriculums(query: CurriculumQueryParams): Promise<Curriculum[]>;
   countCurriculums(query: CurriculumQueryParams): Promise<number>;
   getCurriculumById(id: number): Promise<Curriculum | null>;
+  getCurriculumByYear(year: string): Promise<Curriculum | null>;
   updateCurriculum(id: number, data: CurriculumUpdatePayload): Promise<Curriculum>;
   deleteCurriculum(id: number): Promise<Curriculum>;
 }

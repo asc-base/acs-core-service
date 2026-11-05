@@ -19,6 +19,7 @@ export const CurriculumDocs = {
     body: CreateCurriculumDTO,
     response: {
       201: mapResponse(CurriculumDTO),
+      409: mapResponse(t.Null()),
     },
   },
 
@@ -59,6 +60,7 @@ export const CurriculumDocs = {
     response: {
       200: mapResponse(CurriculumDTO),
       404: mapResponse(t.Null()),
+      409: mapResponse(t.Null()),
     },
   },
 
