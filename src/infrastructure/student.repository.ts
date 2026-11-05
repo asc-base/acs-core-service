@@ -175,4 +175,19 @@ export class StudentRepository implements IStudentRepository {
   async countStudents(query: StudentQueryParams): Promise<number> {
     return this.db.userStudentView.count({ where: studentViewWhere(query) });
   }
+
+  async findExistingStudentCodes(studentCodes: string[]): Promise<string[]> {
+    if (studentCodes.length === 0) return [];
+
+    const students = await this.db.student.findMany({
+      where: {
+        studentCode: { in: studentCodes },
+        deletedAt: null,
+        user: { deletedAt: null },
+      },
+      select: { studentCode: true },
+    });
+
+    return [...new Set(students.map((student) => student.studentCode))];
+  }
 }
