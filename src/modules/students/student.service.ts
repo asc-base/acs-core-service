@@ -14,7 +14,6 @@ import { IStudentRepository } from "./domain/student.repository";
 import { CreateUserModel, UpdateUserModel } from "../users/domain/user";
 import { AppError } from "../../core/error/app-error";
 import { ErrorCode } from "../../core/types/errors";
-import { HttpStatusCode } from "../../core/types/http";
 import { IStudentFactory } from "./student.factory";
 import { PageableType } from "../../core/models";
 import { IUnitOfWork } from "../../core/uow/uow.interface";
@@ -361,29 +360,7 @@ export class StudentService implements IStudentService {
       validRecords.push(parsedRow as CreateStudent);
     }
 
-    const duplicateCodesInFile = this.findDuplicateValues(
-      validRecords.map((record) => record.studentCode),
-    );
-    if (duplicateCodesInFile.length > 0) {
-      throw new AppError(
-        ErrorCode.DUPLICATE_DATA_ERROR,
-        `Duplicate student codes in file: ${duplicateCodesInFile.join(", ")}`,
-        HttpStatusCode.CONFICLT_ERROR,
-      );
-    }
-
     await this.unitOfWork.runInTransaction(async (transaction) => {
-      const existingCodes = await transaction.student.findExistingStudentCodes(
-        validRecords.map((record) => record.studentCode),
-      );
-      if (existingCodes.length > 0) {
-        throw new AppError(
-          ErrorCode.DUPLICATE_DATA_ERROR,
-          `Student codes already exist: ${existingCodes.join(", ")}`,
-          HttpStatusCode.CONFICLT_ERROR,
-        );
-      }
-
       for (const record of validRecords) {
         const {
           linkedin,
@@ -419,15 +396,5 @@ export class StudentService implements IStudentService {
         await transaction.student.createStudent(rawStudentData);
       }
     });
-  }
-
-  private findDuplicateValues(values: string[]): string[] {
-    const seen = new Set<string>();
-    const duplicates = new Set<string>();
-    for (const value of values) {
-      if (seen.has(value)) duplicates.add(value);
-      else seen.add(value);
-    }
-    return [...duplicates];
   }
 }

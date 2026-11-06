@@ -9,6 +9,7 @@ import { IStudentRepository } from "../modules/students/domain/student.repositor
 import { calculatePagination } from "../core/utils/calculator";
 import { AppError } from "../core/error/app-error";
 import { ErrorCode } from "../core/types/errors";
+import { HttpStatusCode } from "../core/types/http";
 import { PrismaInstance } from "../lib/db";
 
 const studentViewWhere = (
@@ -58,6 +59,16 @@ export class StudentRepository implements IStudentRepository {
       });
       return student as Student;
     } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new AppError(
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "A student with this student code already exists",
+          HttpStatusCode.CONFICLT_ERROR,
+        );
+      }
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2003"
@@ -167,6 +178,13 @@ export class StudentRepository implements IStudentRepository {
             404,
           );
         }
+        if (error.code === "P2002") {
+          throw new AppError(
+            ErrorCode.DUPLICATE_DATA_ERROR,
+            "A student with this student code already exists",
+            HttpStatusCode.CONFICLT_ERROR,
+          );
+        }
       }
       throw error;
     }
@@ -174,20 +192,5 @@ export class StudentRepository implements IStudentRepository {
 
   async countStudents(query: StudentQueryParams): Promise<number> {
     return this.db.userStudentView.count({ where: studentViewWhere(query) });
-  }
-
-  async findExistingStudentCodes(studentCodes: string[]): Promise<string[]> {
-    if (studentCodes.length === 0) return [];
-
-    const students = await this.db.student.findMany({
-      where: {
-        studentCode: { in: studentCodes },
-        deletedAt: null,
-        user: { deletedAt: null },
-      },
-      select: { studentCode: true },
-    });
-
-    return [...new Set(students.map((student) => student.studentCode))];
   }
 }

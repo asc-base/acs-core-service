@@ -17,5 +17,4 @@ export interface IStudentRepository {
     data: StudentUpdatePayload,
   ): Promise<Student>;
   countStudents(query: StudentQueryParams): Promise<number>;
-  findExistingStudentCodes(studentCodes: string[]): Promise<string[]>;
 }
