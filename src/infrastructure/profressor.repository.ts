@@ -66,8 +66,8 @@ export class ProfessorRepository implements IProfessorRepository {
 
   async getProfessors(query: ProfessorQueryParams): Promise<Professor[]> {
     const {
-      page = 1,
-      pageSize = 10,
+      page,
+      pageSize,
       orderBy = "createdAt",
       sortBy = "asc",
     } = query;
@@ -86,8 +86,8 @@ export class ProfessorRepository implements IProfessorRepository {
           ];
 
     const rows = await this.db.userProfessorView.findMany({
-      skip: calculatePagination(page, pageSize),
-      take: pageSize,
+      skip: pageSize ? calculatePagination(page ?? 1, pageSize) : undefined,
+      take: pageSize ?? undefined,
       orderBy: professorOrder,
       where: professorViewWhere(query),
       include: {
