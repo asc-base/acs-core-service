@@ -4,6 +4,7 @@
 Install dependencies:
 ```bash
 npm ci
+npm run prisma:generate
 ```
 
 ## Development

@@ -12,7 +12,7 @@ import { ErrorCode } from "../core/types/errors";
 import { PrismaInstance } from "../lib/db";
 
 export class CourseRepository implements ICourseRepository {
-  constructor(private readonly db: PrismaInstance) {}
+  constructor(private readonly db: PrismaInstance) { }
 
   async createCourse(
     data: CourseCreatePayload,
@@ -25,10 +25,10 @@ export class CourseRepository implements ICourseRepository {
 
           preCourses: preCourseID.length
             ? {
-                create: preCourseID.map((id) => ({
-                  preCourseID: id,
-                })),
-              }
+              create: preCourseID.map((id) => ({
+                preCourseID: id,
+              })),
+            }
             : undefined,
         },
         include: {
@@ -52,8 +52,8 @@ export class CourseRepository implements ICourseRepository {
 
   async getCoures(query: CourseQueryParams): Promise<Course[]> {
     const {
-      page = 1,
-      pageSize = 10,
+      page,
+      pageSize,
       orderBy = "createdAt",
       sortBy,
       typeCourseID,
@@ -61,8 +61,8 @@ export class CourseRepository implements ICourseRepository {
       search,
     } = query;
     const courses = await this.db.course.findMany({
-      skip: calculatePagination(page, pageSize),
-      take: pageSize,
+      skip: pageSize ? calculatePagination(page || 1, pageSize) : undefined,
+      take: pageSize ?? undefined,
       orderBy: {
         [orderBy]: sortBy,
       },

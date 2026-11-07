@@ -6,10 +6,10 @@ import {
 } from "../../curriculums/domain/curriculum";
 import type { StoredImageMedia } from "../../users/domain/image-media";
 import { ImageMediaSchema } from "../../users/domain/image-media";
+import { ClassBookPlain } from "../../../generated/prismabox/ClassBook";
 
 export const CommonClassBookFields = {
-  classof: t.String(),
-  firstYearAcademic: t.String(),
+  ...t.Pick(ClassBookPlain, ["classof", "firstYearAcademic"]).properties,
 };
 
 export const FocalPointFields = {
@@ -17,19 +17,16 @@ export const FocalPointFields = {
   imageFocalPointY: t.Optional(t.Nullable(t.Numeric())),
 };
 
-export const ClassBookSchema = t.Intersect([
-  t.Object({
-    id: t.Number(),
-    ...CommonClassBookFields,
-    thumbnailURL: t.String(),
-    thumbnailContentType: t.Optional(t.Nullable(t.String())),
-    imageMedia: t.Optional(t.Nullable(ImageMediaSchema)),
-    ...FocalPointFields,
-    curriculumID: t.Number(),
-    curriculum: CurriculumSchema,
-  }),
-  BaseModelSchema,
-]);
+export const ClassBookSchema = t.Object({
+  ...t.Pick(ClassBookPlain, ["id", "thumbnailURL", "curriculumID"]).properties,
+  ...CommonClassBookFields,
+  thumbnailContentType: t.Optional(t.Nullable(t.String())),
+  imageID: t.Optional(t.Nullable(ClassBookPlain.properties.imageID)),
+  imageMedia: t.Optional(t.Nullable(ImageMediaSchema)),
+  ...FocalPointFields,
+  curriculum: CurriculumSchema,
+  ...BaseModelSchema.properties,
+});
 
 export const CreateClassBookDTO = t.Object({
   ...CommonClassBookFields,
@@ -46,12 +43,10 @@ export const ClassBookQueryParams = t.Object({
 });
 
 export const ClassBookDTO = t.Object({
-  id: t.Number(),
+  ...t.Pick(ClassBookPlain, ["id", "thumbnailURL", "curriculumID"]).properties,
   ...CommonClassBookFields,
-  thumbnailURL: t.String(),
   thumbnailContentType: t.Optional(t.Nullable(t.String())),
   ...FocalPointFields,
-  curriculumID: t.Number(),
   curriculum: CurriculumDTO,
 });
 
@@ -65,18 +60,16 @@ export const UpdateClassBookDTO = t.Partial(
 );
 
 export const ClassBookCreatePayloadSchema = t.Object({
-  classof: t.String(),
-  firstYearAcademic: t.String(),
-  thumbnailURL: t.String(),
+  ...t.Pick(ClassBookPlain, ["classof", "firstYearAcademic", "thumbnailURL"])
+    .properties,
   ...FocalPointFields,
   curriculumID: t.Number(),
 });
 
 export const ClassBookUpdatePayloadSchema = t.Partial(
   t.Object({
-    classof: t.String(),
-    firstYearAcademic: t.String(),
-    thumbnailURL: t.String(),
+    ...t.Pick(ClassBookPlain, ["classof", "firstYearAcademic", "thumbnailURL"])
+      .properties,
     ...FocalPointFields,
     curriculumID: t.Number(),
   }),
@@ -87,5 +80,9 @@ export type ClassBookDTO = Static<typeof ClassBookDTO>;
 export type CreateClassBookDTO = Static<typeof CreateClassBookDTO>;
 export type ClassBookQueryParams = Static<typeof ClassBookQueryParams>;
 export type UpdateClassBookDTO = Static<typeof UpdateClassBookDTO>;
-export type ClassBookCreatePayload = Static<typeof ClassBookCreatePayloadSchema> & { thumbnailMedia?: StoredImageMedia };
-export type ClassBookUpdatePayload = Static<typeof ClassBookUpdatePayloadSchema> & { thumbnailMedia?: StoredImageMedia };
+export type ClassBookCreatePayload = Static<
+  typeof ClassBookCreatePayloadSchema
+> & { thumbnailMedia?: StoredImageMedia };
+export type ClassBookUpdatePayload = Static<
+  typeof ClassBookUpdatePayloadSchema
+> & { thumbnailMedia?: StoredImageMedia };

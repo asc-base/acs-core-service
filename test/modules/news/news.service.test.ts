@@ -4,7 +4,6 @@ import type {
   CreateNewsDTO,
   News,
   NewsCreatePayload,
-  NewsFeature,
   NewsWithAdditionalImages,
   NewsUpdatePayload,
 } from "../../../src/modules/news/domain/news";
@@ -27,8 +26,7 @@ const newsFixture = (focalPoints?: {
   thumbnail: "https://example.com/thumbnail.jpg",
   thumbnailFocalPointX: focalPoints?.thumbnailFocalPointX ?? null,
   thumbnailFocalPointY: focalPoints?.thumbnailFocalPointY ?? null,
-  tagID: 1,
-  tag: { id: 1, name: "Announcement", tagsGroupsId: 1 },
+  category: { id: 1, code: "ANNOUNCEMENT", name: "Announcement" },
   createdAt: startDate,
   updatedAt: startDate,
   deletedAt: null,
@@ -53,24 +51,8 @@ class FakeNewsRepository {
     return { ...this.news, newsAdditionalImages: [] };
   }
 
-  async upsertNewsFeature(): Promise<NewsFeature> {
-    throw new Error("Not implemented");
-  }
-
-  async getNewsFeaturesBy(): Promise<NewsFeature[]> {
-    return [];
-  }
-
   async countNews(): Promise<number> {
     return 1;
-  }
-
-  async countNewsFeatures(): Promise<number> {
-    return 0;
-  }
-
-  async getNewsFeatureById(): Promise<NewsFeature | null> {
-    return null;
   }
 
   async getNewsBulletins(type: "HIGHLIGHT" | "ANNOUNCEMENT") {
@@ -108,7 +90,7 @@ const createNewsInput = (focalPoints?: {
   detail: "News detail",
   startDate,
   thumbnail: png(),
-  tagID: 1,
+  newsCategoryId: 1,
   ...focalPoints,
 });
 
@@ -185,12 +167,42 @@ describe("NewsService", () => {
     const { service } = createService(repository);
 
     const enabled = await service.setNewsBulletin(1, "HIGHLIGHT", true);
-    expect(enabled).toMatchObject({ id: 9, newsID: 1, type: "HIGHLIGHT", news: { id: 1 } });
+    expect(enabled).toMatchObject({
+      id: 9,
+      newsID: 1,
+      type: "HIGHLIGHT",
+      imageUrl: repository.news.thumbnail,
+      news: { id: 1 },
+    });
     expect(await service.getNewsBulletins("HIGHLIGHT")).toHaveLength(1);
 
     const disabled = await service.setNewsBulletin(1, "HIGHLIGHT", false);
     expect(disabled).toBeNull();
     expect(await service.getNewsBulletins("HIGHLIGHT")).toEqual([]);
+  });
+
+  test.each([
+    ["HIGHLIGHT", "https://example.com/highlight.jpg"],
+    ["ANNOUNCEMENT", "https://example.com/card.jpg"],
+  ] as const)("returns the %s image with the bulletin response", async (type, imageUrl) => {
+    const repository = new FakeNewsRepository();
+    repository.news = {
+      ...newsFixture(),
+      images: [
+        { id: 1, imageID: 1, imageType: "CARD", imageUrl: "https://example.com/card.jpg", focalPointX: null, focalPointY: null, sortOrder: 0 },
+        { id: 2, imageID: 2, imageType: "THUMBNAIL", imageUrl: "https://example.com/highlight.jpg", focalPointX: null, focalPointY: null, sortOrder: 0 },
+      ],
+    };
+    await repository.setNewsBulletin(1, type, true);
+    const { service } = createService(repository);
+
+    const [bulletin] = await service.getNewsBulletins(type);
+    expect(bulletin).toMatchObject({ type, imageUrl });
+    expect(Object.keys(bulletin)).toEqual(["id", "newsID", "type", "imageUrl", "news"]);
+    await expect(service.setNewsBulletin(1, type, true)).resolves.toMatchObject({
+      type,
+      imageUrl,
+    });
   });
 
   test("updates detail images with the requested order and scoped deletions", async () => {

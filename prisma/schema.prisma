@@ -11,6 +11,16 @@ generator client {
   output        = "../src/generated/prisma"
 }
 
+generator prismabox {
+  provider                   = "prismabox"
+  output                     = "../src/generated/prismabox"
+  typeboxImportDependencyName = "elysia"
+  typeboxImportVariableName   = "t"
+  inputModel                  = false
+  useJsonTypes                = false
+  additionalProperties        = false
+}
+
 datasource db {
   provider = "postgresql"
   schemas  = ["public", "auth"]
@@ -20,7 +30,6 @@ model Role {
   id             Int             @id @default(autoincrement()) @map("id")
   name           String          @unique @map("name")
   userRoles      UserRole[]
-  projectMembers ProjectMember[]
 
   @@map("roles")
   @@schema("public")
@@ -168,28 +177,6 @@ model Verification {
   @@schema("auth")
 }
 
-model TageGroups {
-  id   Int    @id @default(autoincrement()) @map("id")
-  name String @unique @map("name")
-  tags Tag[]
-
-  @@map("tag_groups")
-  @@schema("public")
-}
-
-model Tag {
-  id           Int            @id @default(autoincrement()) @map("id")
-  name         String         @unique @map("name")
-  tageGroups   TageGroups?    @relation(fields: [tageGroupsId], references: [id])
-  tageGroupsId Int            @map("tage_groups_id")
-  news         News[]
-  newsFeatures NewsFeatures[]
-  projectTags  ProjectTag[]
-
-  @@map("tags")
-  @@schema("public")
-}
-
 model News {
   id           Int            @id @default(autoincrement()) @map("id")
   title        String         @map("title")
@@ -202,17 +189,15 @@ model News {
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at")
   deletedAt    DateTime?      @map("deleted_at")
-  tagID        Int            @map("tag_id")
-  tag          Tag            @relation(fields: [tagID], references: [id])
   newsCategoryID Int?          @map("news_category_id")
-  newsCategory   NewsCategory? @relation(fields: [newsCategoryID], references: [id])
+  newsCategory   NewsCategory? @relation(fields: [newsCategoryID], references: [id], onDelete: SetNull, onUpdate: Cascade)
   eventStartAt   DateTime?      @map("event_start_at")
   eventEndAt     DateTime?      @map("event_end_at")
-  newsFeatures NewsFeatures[]
   newsAdditionalImages NewsAdditionalImage[]
   newsImages   NewsImage[]
   newsBulletins NewsBulletin[]
 
+  @@index([newsCategoryID])
   @@map("news")
   @@schema("public")
 }
@@ -316,7 +301,7 @@ model Student {
 model Curriculum {
   id           Int         @id @default(autoincrement()) @map("id")
   title        String      @map("title")
-  year         String      @map("year")
+  year         String      @unique @map("year")
   documentURL  String      @map("document_url")
   description  String      @map("description")
   thumbnailURL String      @map("thumbnail_url")
@@ -515,34 +500,13 @@ view UserProfessorView {
   @@schema("public")
 }
 
-model NewsFeatures {
-  id           Int       @id @default(autoincrement()) @map("id")
-  thumbnailURL String    @map("thumbnail_url")
-  newsID       Int       @map("news_id")
-  tagID        Int       @map("tag_id")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  deletedAt    DateTime? @map("deleted_at")
-  news         News      @relation(fields: [newsID], references: [id])
-  tag          Tag       @relation(fields: [tagID], references: [id])
-  thumbnailFocalPointX Float? @map("thumbnail_focal_point_x")
-  thumbnailFocalPointY Float? @map("thumbnail_focal_point_y")
-
-  @@unique([newsID, tagID])
-  @@map("news_features")
-  @@schema("public")
-}
-
 model Project {
   id              Int             @id @default(autoincrement()) @map("id")
   title           String          @map("title")
-  thumbnailURL    String          @map("thumbnail_url")
   imageID         Int?            @map("image_id")
   thumbnailFocalPointX Float?     @map("thumbnail_focal_point_x")
   thumbnailFocalPointY Float?     @map("thumbnail_focal_point_y")
-  assetsURL       String          @map("assets_url")
-  techStacks      String          @map("tech_stacks")
-  details         String          @map("details")
+  detail          String?         @map("detail")
   githubURL       String          @map("github_url")
   presentationURL String          @map("presentation_url")
   documentURL     String          @map("document_url")
@@ -551,9 +515,12 @@ model Project {
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
   deletedAt       DateTime?       @map("deleted_at")
-  projectTags     ProjectTag[]
+  projectFields   ProjectField[]
+  projectCategories ProjectCategory[]
+  projectProjectTypes ProjectProjectType[]
   projectMembers  ProjectMember[]
   projectCourses  ProjectCourse[]
+  projectTechStacks ProjectTechStack[]
   imageMedia      ImageMedia?     @relation(fields: [imageID], references: [id], onDelete: SetNull, onUpdate: Cascade)
   images          ProjectImage[]
 
@@ -578,19 +545,95 @@ model ProjectImage {
   @@schema("public")
 }
 
-model ProjectTag {
+model TechStack {
+  id       Int               @id @default(autoincrement()) @map("id")
+  name     String            @unique @map("name")
+  projects ProjectTechStack[]
+
+  @@map("tech_stacks")
+  @@schema("public")
+}
+
+model ProjectTechStack {
+  id          Int       @id @default(autoincrement()) @map("id")
+  projectID   Int       @map("project_id")
+  techStackID Int       @map("tech_stack_id")
+  project     Project   @relation(fields: [projectID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  techStack   TechStack @relation(fields: [techStackID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([projectID])
+  @@index([techStackID])
+  @@unique([projectID, techStackID])
+  @@map("project_tech_stacks")
+  @@schema("public")
+}
+
+model Field {
+  id       Int            @id @default(autoincrement()) @map("id")
+  name     String         @unique @map("name")
+  projects ProjectField[]
+
+  @@map("fields")
+  @@schema("public")
+}
+
+model ProjectField {
   id        Int       @id @default(autoincrement()) @map("id")
   projectID Int       @map("project_id")
-  tagID     Int       @map("tag_id")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  fieldID   Int       @map("field_id")
+  project   Project   @relation(fields: [projectID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  field     Field     @relation(fields: [fieldID], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  project Project @relation(fields: [projectID], references: [id])
-  tag     Tag     @relation(fields: [tagID], references: [id])
+  @@index([projectID])
+  @@index([fieldID])
+  @@unique([projectID, fieldID])
+  @@map("project_fields")
+  @@schema("public")
+}
 
-  @@unique([projectID, tagID])
-  @@map("project_tags")
+model Category {
+  id       Int                 @id @default(autoincrement()) @map("id")
+  name     String              @unique @map("name")
+  projects ProjectCategory[]
+
+  @@map("categories")
+  @@schema("public")
+}
+
+model ProjectCategory {
+  id         Int       @id @default(autoincrement()) @map("id")
+  projectID  Int       @map("project_id")
+  categoryID Int       @map("category_id")
+  project    Project   @relation(fields: [projectID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  category   Category  @relation(fields: [categoryID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([projectID])
+  @@index([categoryID])
+  @@unique([projectID, categoryID])
+  @@map("project_categories")
+  @@schema("public")
+}
+
+model ProjectType {
+  id       Int                   @id @default(autoincrement()) @map("id")
+  name     String                @unique @map("name")
+  projects ProjectProjectType[]
+
+  @@map("project_types")
+  @@schema("public")
+}
+
+model ProjectProjectType {
+  id        Int         @id @default(autoincrement()) @map("id")
+  projectID Int         @map("project_id")
+  typeID    Int         @map("type_id")
+  project   Project     @relation(fields: [projectID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  type      ProjectType @relation(fields: [typeID], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([projectID])
+  @@index([typeID])
+  @@unique([projectID, typeID])
+  @@map("project_project_types")
   @@schema("public")
 }
 
@@ -598,17 +641,26 @@ model ProjectMember {
   id        Int       @id @default(autoincrement()) @map("id")
   projectID Int       @map("project_id")
   userID    Int       @map("user_id")
-  roleID    Int       @map("role_id")
+  memberType ProjectMemberType @map("member_type")
+  position  String?   @map("position")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
   project Project @relation(fields: [projectID], references: [id])
   user    User    @relation(fields: [userID], references: [id])
-  role    Role    @relation(fields: [roleID], references: [id])
 
   @@unique([projectID, userID])
   @@map("project_members")
+  @@schema("public")
+}
+
+enum ProjectMemberType {
+  STUDENT
+  ADVISOR
+  CO_ADVISOR
+
+  @@map("project_member_type")
   @@schema("public")
 }
 

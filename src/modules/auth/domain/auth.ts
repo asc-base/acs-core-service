@@ -1,7 +1,13 @@
 import { Static, t } from "elysia";
+import { AuthUserPlain } from "../../../generated/prismabox/AuthUser";
+
+const AuthEmailSchema = t.Intersect([
+  AuthUserPlain.properties.email,
+  t.String({ format: "email" }),
+]);
 
 export const CommonAuthFields = {
-  email: t.String({ format: "email" }),
+  email: AuthEmailSchema,
   password: t.String(),
 };
 
@@ -10,7 +16,7 @@ export const AuthRequestDTO = t.Object({
 });
 
 export const CreateCredentialsDTO = t.Object({
-  email: t.String({ format: "email" }),
+  email: AuthEmailSchema,
 });
 
 export const ResetPasswordDTO = t.Object({

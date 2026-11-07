@@ -65,9 +65,10 @@ export class ClassBookService implements IClassBookService {
   async getClassBooks(
     query: ClassBookQueryParams,
   ): Promise<PageableType<typeof ClassBookDTO>> {
+    const searchQuery = this.normalizeClassofSearch(query);
     const [classBooks, totalRecords] = await Promise.all([
-      this.classBookRepository.getClassBooks(query),
-      this.classBookRepository.countClassBooks(query),
+      this.classBookRepository.getClassBooks(searchQuery),
+      this.classBookRepository.countClassBooks(searchQuery),
     ]);
 
     return {
@@ -127,4 +128,10 @@ export class ClassBookService implements IClassBookService {
     return this.classBookFactory.mapClassBookToDTO(classBook);
   }
 
+  private normalizeClassofSearch(query: ClassBookQueryParams): ClassBookQueryParams {
+    if (query.searchBy !== "classof" || !query.search) return query;
+
+    const search = query.search.trim().replace(/^รุ่น(ที่)?\s*/, "").trim();
+    return { ...query, search: search || undefined };
+  }
 }

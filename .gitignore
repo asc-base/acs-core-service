@@ -42,6 +42,7 @@ yarn-error.log*
 
 .env
 /src/generated/prisma
+/src/generated/prismabox
 databasepg/
 
 .secrets
@@ -50,3 +51,4 @@ databasepg/
 /.agents
 
 .scratch
+/src/generated/prismabox

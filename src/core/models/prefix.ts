@@ -1,16 +1,8 @@
-import { t, Static } from "elysia";
+import { Static } from "elysia";
+import { PrefixPlain } from "../../generated/prismabox/Prefix";
 
-export const CommonPrefix = {
-  id: t.Number(),
-  sequence: t.Number(),
-  nameTh: t.String(),
-  nameEn: t.String(),
-  shortNameTh: t.String(),
-  shortNameEn: t.String(),
-};
+export const CommonPrefix = PrefixPlain.properties;
 
-export const PrefixSchema = t.Object({
-  ...CommonPrefix,
-});
+export const PrefixSchema = PrefixPlain;
 
 export type Prefix = Static<typeof PrefixSchema>;

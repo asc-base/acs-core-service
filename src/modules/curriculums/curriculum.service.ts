@@ -43,6 +43,15 @@ export class CurriculumService implements ICurriculumService {
         );
       }
 
+      const existingCurriculum = await this.curriculumRepository.getCurriculumByYear(rest.year);
+      if (existingCurriculum) {
+        throw new AppError(
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "Curriculum with this year already exists",
+          HttpStatusCode.CONFICLT_ERROR,
+        );
+      }
+
       const contentType = await detectImageContentType(thumbnailFile);
       uploadedThumbnail = await this.storageService.upload(thumbnailFile, contentType, "curriculums/images");
 
@@ -108,6 +117,18 @@ export class CurriculumService implements ICurriculumService {
     }
 
     const { thumbnailFile, ...rest } = data;
+
+    if (rest.year && rest.year !== existingCurriculum.year) {
+      const duplicateCurriculum = await this.curriculumRepository.getCurriculumByYear(rest.year);
+      if (duplicateCurriculum && duplicateCurriculum.id !== id) {
+        throw new AppError(
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "Curriculum with this year already exists",
+          HttpStatusCode.CONFICLT_ERROR,
+        );
+      }
+    }
+
     let updatedThumbnailPath = existingCurriculum.imageMedia?.imageUrl ?? existingCurriculum.thumbnailURL;
     let uploadedThumbnail: StoredImage | undefined;
     let uploadedContentType: string | undefined;

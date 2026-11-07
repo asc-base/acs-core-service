@@ -1,72 +1,46 @@
-import { CreateProjectDTO, ProjectDTO, ProjectQueryParams, UpdateProjectDTO } from "./domain/project";
-import { mapResponse } from "../../core/interceptor/response";
 import { t } from "elysia";
 import { Pageable } from "../../core/models";
+import { mapResponse } from "../../core/interceptor/response";
+import {
+  ProjectDTO,
+  CreateProjectMultipartBody,
+  ProjectMultipartBody,
+  ProjectQueryParams,
+} from "./domain/project";
 
 export const ProjectDocs = {
   createProject: {
     detail: {
       summary: "Create project",
-      description: "Create a new project with the provided information",
+      description: "Create a project with a JSON payload, thumbnail, and ordered gallery assets",
       tags: ["Projects"],
     },
-    body: CreateProjectDTO,
-    response: {
-      201: mapResponse(ProjectDTO),
-    },
+    body: CreateProjectMultipartBody,
+    response: { 201: mapResponse(ProjectDTO) },
   },
   getProject: {
-    detail: {
-          summary: "Get all project",
-          description: "Retrieve a list of all project items",
-          tags: ["Projects"],
-        },
-        query: ProjectQueryParams,
-        response: {
-          200: mapResponse(Pageable(ProjectDTO)),
-        },
+    detail: { summary: "List projects", tags: ["Projects"] },
+    query: ProjectQueryParams,
+    response: { 200: mapResponse(Pageable(ProjectDTO)) },
   },
   getProjectById: {
-    detail: {
-      summary: "Get project by ID",
-      description: "Retrieve a specific project by its ID",
-      tags: ["Projects"],
-    },
-    params: t.Object({
-      id: t.Numeric(),
-    }),
-    response: {
-      200: mapResponse(ProjectDTO),
-      404: mapResponse(t.Null()),
-    },
+    detail: { summary: "Get project", tags: ["Projects"] },
+    params: t.Object({ id: t.Numeric() }),
+    response: { 200: mapResponse(ProjectDTO), 404: mapResponse(t.Null()) },
   },
-  updateProject:{
+  updateProject: {
     detail: {
       summary: "Update project",
-      description: "Update an existing project with the provided information",
+      description: "Update a project with a JSON payload and optional uploaded media",
       tags: ["Projects"],
     },
-    params: t.Object({
-      id: t.Numeric(),
-    }),
-    body: UpdateProjectDTO,
-    response: {
-      200: mapResponse(ProjectDTO),
-      404: mapResponse(t.Null()),
-    },
+    params: t.Object({ id: t.Numeric() }),
+    body: ProjectMultipartBody,
+    response: { 200: mapResponse(ProjectDTO), 404: mapResponse(t.Null()) },
   },
   deleteProject: {
-    detail: {
-      summary: "Delete project",
-      description: "Delete a project by its ID",
-      tags: ["Projects"],
-    },
-    params: t.Object({
-      id: t.Numeric(),
-    }),
-    response: {
-      204: mapResponse(t.Null()),
-      404: mapResponse(t.Null()),
-    },
+    detail: { summary: "Delete project", tags: ["Projects"] },
+    params: t.Object({ id: t.Numeric() }),
+    response: { 200: mapResponse(ProjectDTO), 404: mapResponse(t.Null()) },
   },
 };

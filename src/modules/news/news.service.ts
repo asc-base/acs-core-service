@@ -8,18 +8,15 @@ import {
   CreateNewsDTO,
   NewsDTO,
   NewsQueryParams,
-  NewsFeatureDTO,
   NewsWithAdditionalImageDTO,
-  UpsertNewsFeatureDTO,
-  QueryNewsFeatureParams,
   NewsUpdateDTO,
   NewsCreatePayload,
   NewsUpdatePayload,
-  NewsFeatureUpsertPayload,
   NewsImageInput,
   NewsBulletinType,
   NewsBulletinDTO,
 } from "./domain/news";
+import type { NewsBulletinView } from "./domain/news";
 import { INewsRepository } from "./domain/news.repository";
 import { NewsFactory } from "./news.factory";
 import { PageableType } from "../../core/models";
@@ -28,13 +25,6 @@ interface INewsService {
   createNews(data: CreateNewsDTO): Promise<NewsDTO>;
   getNews(query: NewsQueryParams): Promise<PageableType<typeof NewsDTO>>;
   getNewsById(id: number): Promise<NewsWithAdditionalImageDTO | null>;
-  upsertNewsFeature(
-    data: UpsertNewsFeatureDTO,
-  ): Promise<NewsFeatureDTO>;
-  getNewsFeatures(
-    query: QueryNewsFeatureParams,
-  ): Promise<PageableType<typeof NewsFeatureDTO>>;
-  getNewsFeatureById(id: number): Promise<NewsFeatureDTO | null>;
   getNewsBulletins(type: NewsBulletinType): Promise<Array<Static<typeof NewsBulletinDTO>>>;
   setNewsBulletin(newsID: number, type: NewsBulletinType, enabled: boolean): Promise<Static<typeof NewsBulletinDTO> | null>;
 }
@@ -45,20 +35,36 @@ export class NewsService implements INewsService {
     private readonly newsFactory: NewsFactory,
     private readonly storageService: ProfileImageStorage,
   ) { }
+
+  private mapNewsBulletinToDTO(
+    bulletin: NewsBulletinView,
+  ): Static<typeof NewsBulletinDTO> {
+    const { id, newsID, type, news } = bulletin;
+    const imageType = type === "HIGHLIGHT" ? "THUMBNAIL" : "CARD";
+    const imageUrl =
+      news.images?.find((image) => image.imageType === imageType)?.imageUrl ??
+      news.thumbnail;
+
+    return {
+      id,
+      newsID,
+      type,
+      imageUrl,
+      news: this.newsFactory.mapNewsToDTO(news),
+    };
+  }
+
   async createNews(
     data: CreateNewsDTO,
   ): Promise<NewsDTO> {
     const cardFile = data.cardImage ?? data.thumbnail ?? data.thumbnailImage;
     const thumbnailFile = data.thumbnailImage ?? data.cardImage ?? data.thumbnail;
     const detailFiles = data.detailImages ?? data.additionalImages ?? [];
-    const categoryID = data.newsCategoryId ?? data.tagID;
+    const categoryID = data.newsCategoryId;
     const eventStartAt = data.eventStartAt ?? data.startDate;
     const eventEndAt = data.eventEndAt ?? data.dueDate ?? null;
     if (!cardFile || !thumbnailFile || !categoryID || !eventStartAt) {
       throw new AppError(ErrorCode.VALIDATION_ERROR, "Card image, category, and event start are required", 400);
-    }
-    if (data.tagID && data.newsCategoryId && data.tagID !== data.newsCategoryId) {
-      throw new AppError(ErrorCode.VALIDATION_ERROR, "Legacy tagID and newsCategoryId must match", 400);
     }
     if (data.startDate && data.eventStartAt && data.startDate.getTime() !== data.eventStartAt.getTime()) {
       throw new AppError(ErrorCode.VALIDATION_ERROR, "Legacy startDate and eventStartAt must match", 400);
@@ -106,8 +112,7 @@ export class NewsService implements INewsService {
       const payload: NewsCreatePayload = {
         title: data.title,
         detail: data.detail,
-        tagID: categoryID,
-        ...(data.newsCategoryId ? { newsCategoryID: data.newsCategoryId } : {}),
+        newsCategoryID: data.newsCategoryId,
         startDate: eventStartAt,
         dueDate: eventEndAt,
         eventStartAt,
@@ -166,111 +171,15 @@ export class NewsService implements INewsService {
     }
   }
 
-  async upsertNewsFeature(data: UpsertNewsFeatureDTO): Promise<NewsFeatureDTO> {
-    let uploaded: StoredImage | undefined;
-    try {
-      const { thumbnail, id, ...rest } = data;
-
-      let thumbnailURL: string;
-      let media: NewsImageInput["media"];
-
-      if (typeof thumbnail === "string") {
-        thumbnailURL = thumbnail;
-        media = { provider: "legacy_url", imageUrl: thumbnail };
-      } else {
-        if (!thumbnail) {
-          throw new AppError(
-            ErrorCode.VALIDATION_ERROR,
-            "Thumbnail file is required",
-            400,
-          );
-        }
-
-        const contentType = await validateNewsImage(thumbnail);
-        uploaded = await this.storageService.upload(thumbnail, contentType, "news/images");
-        thumbnailURL = uploaded.imageUrl;
-        media = { ...uploaded, fileName: thumbnail.name, contentType, fileSize: thumbnail.size };
-      }
-
-      const newsFeatureData: NewsFeatureUpsertPayload = {
-        ...rest,
-        thumbnailURL,
-        media,
-      };
-
-      if (!id) {
-        const newsFeature = await this.newsRepository.createNewsFeature(
-          newsFeatureData,
-        );
-        return this.newsFactory.mapNewsFeatureToDTO(newsFeature);
-      }
-
-      const newsFeature = await this.newsRepository.updateNewsFeature(
-        id,
-        newsFeatureData,
-      );
-      return this.newsFactory.mapNewsFeatureToDTO(newsFeature);
-    } catch (error) {
-      if (uploaded?.bucket && uploaded.fileKey) {
-        await this.storageService.delete(uploaded.bucket, uploaded.fileKey).catch(() => undefined);
-      }
-      if (error instanceof AppError) throw error;
-      throw new AppError(
-        ErrorCode.DATABASE_ERROR,
-        "Failed to upsert news feature",
-        500,
-      );
-    }
-  }
-
-  async getNewsFeatures(
-    query: QueryNewsFeatureParams,
-  ): Promise<PageableType<typeof NewsFeatureDTO>> {
-    const [newsFeatures, countNewsFeatures] = await Promise.all([
-      this.newsRepository.getNewsFeaturesBy(query),
-      this.newsRepository.countNewsFeatures(query),
-    ]);
-
-    return {
-      rows: this.newsFactory.mapNewsFeatureListToDTO(newsFeatures),
-      totalRecords: countNewsFeatures,
-      page: query.page || 1,
-      pageSize: query.pageSize || 10,
-    };
-  }
-
-  async getNewsFeatureById(id: number): Promise<NewsFeatureDTO | null> {
-    try {
-      const newsFeature = await this.newsRepository.getNewsFeatureById(id);
-
-      if (!newsFeature) {
-        return null;
-      }
-      return this.newsFactory.mapNewsFeatureToDTO(newsFeature);
-    } catch (error) {
-      if (
-        error instanceof AppError &&
-        error.statusCode === HttpStatusCode.NOT_FOUND
-      ) {
-        return null;
-      }
-      throw error;
-    }
-  }
-
   async getNewsBulletins(type: NewsBulletinType): Promise<Array<Static<typeof NewsBulletinDTO>>> {
     const rows = await this.newsRepository.getNewsBulletins(type);
-    return rows.map(({ news, ...bulletin }) => ({
-      ...bulletin,
-      news: this.newsFactory.mapNewsToDTO(news),
-    }));
+    return rows.map((bulletin) => this.mapNewsBulletinToDTO(bulletin));
   }
 
   async setNewsBulletin(newsID: number, type: NewsBulletinType, enabled: boolean): Promise<Static<typeof NewsBulletinDTO> | null> {
     const row = await this.newsRepository.setNewsBulletin(newsID, type, enabled);
     if (!row) return null;
-    const { news, ...bulletin } = row;
-    return { ...bulletin, news: this.newsFactory.mapNewsToDTO(news) };
+    return this.mapNewsBulletinToDTO(row);
   }
 
   async deleteNews(id: number): Promise<NewsDTO | null> {
@@ -362,17 +271,12 @@ async updateNews(
       detailMedia.push(media);
       images.push({ imageType: "DETAIL", media: { ...media, fileName: file.name, contentType: detectedTypes.get(file), fileSize: file.size } });
     }
-    const categoryID = newsCategoryId ?? fields.tagID;
-    if (newsCategoryId && fields.tagID && newsCategoryId !== fields.tagID) {
-      throw new AppError(ErrorCode.VALIDATION_ERROR, "Legacy tagID and newsCategoryId must match", 400);
-    }
     const startAt = eventStartAt ?? fields.startDate;
     const endAt = eventEndAt !== undefined ? eventEndAt : fields.dueDate;
-    const { thumbnailFocalPointX, thumbnailFocalPointY, startDate, dueDate, tagID, title, detail } = fields;
+    const { thumbnailFocalPointX, thumbnailFocalPointY, startDate, dueDate, title, detail } = fields;
     const payload: NewsUpdatePayload = {
       ...(title !== undefined ? { title } : {}),
       ...(detail !== undefined ? { detail } : {}),
-      ...(categoryID !== undefined ? { tagID: categoryID } : tagID !== undefined ? { tagID } : {}),
       ...(newsCategoryId !== undefined ? { newsCategoryID: newsCategoryId } : {}),
       ...(startAt !== undefined ? { startDate: startAt, eventStartAt: startAt } : startDate !== undefined ? { startDate } : {}),
       ...(endAt !== undefined ? { dueDate: endAt, eventEndAt: endAt } : dueDate !== undefined ? { dueDate } : {}),

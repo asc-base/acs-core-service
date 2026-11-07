@@ -4,7 +4,7 @@ import { NewsRepository } from "../../infrastructure/news.repository";
 import { prisma } from "../../lib/db";
 import { NewsService } from "./news.service";
 import { NewsDocs } from "./news.docs";
-import { success } from "../../core/interceptor/response";
+import { mapResponse, success } from "../../core/interceptor/response";
 import { NewsFactory } from "./news.factory";
 import { createNewsImageStorage } from "../../infrastructure/profile-image-storage";
 import { HttpStatusCode } from "../../core/types/http";
@@ -12,6 +12,7 @@ import { authMiddleware } from "../../middleware/auth";
 import { roleMacro } from "../../middleware/checkRole";
 import { PERMISSION } from "../../core/permission/permission";
 import { AppError } from "../../core/error/app-error";
+import { NewsBulletinDTO } from "./domain/news";
 
 const newsRepository = new NewsRepository(prisma);
 const newsFactory = new NewsFactory();
@@ -44,21 +45,6 @@ export const createNewsController =
                 },
                 {
                   ...NewsDocs.createNews,
-                  checkRole: PERMISSION.ADMINPERSMISSION,
-                },
-              )
-              .put(
-                "/news-features",
-                async ({ newsService, body, set }) => {
-                  const newsFeature = await newsService.upsertNewsFeature(body);
-                  set.status = HttpStatusCode.OK;
-                  return success(
-                    newsFeature,
-                    "News feature upserted successfully",
-                  );
-                },
-                {
-                  ...NewsDocs.upsertNewsFeature,
                   checkRole: PERMISSION.ADMINPERSMISSION,
                 },
               )
@@ -113,7 +99,10 @@ export const createNewsController =
                   },
                   {
                     params: t.Object({ id: t.Numeric(), type: t.Union([t.Literal("HIGHLIGHT"), t.Literal("ANNOUNCEMENT")]) }),
-                    response: { 200: t.Any(), 404: t.Any() },
+                    response: {
+                      200: mapResponse(NewsBulletinDTO),
+                      404: mapResponse(t.Null()),
+                    },
                     checkRole: PERMISSION.ADMINPERSMISSION,
                   },
                 )
@@ -130,7 +119,10 @@ export const createNewsController =
                   },
                   {
                     params: t.Object({ id: t.Numeric(), type: t.Union([t.Literal("HIGHLIGHT"), t.Literal("ANNOUNCEMENT")]) }),
-                    response: { 200: t.Any(), 404: t.Any() },
+                    response: {
+                      200: mapResponse(t.Null()),
+                      404: mapResponse(t.Null()),
+                    },
                     checkRole: PERMISSION.ADMINPERSMISSION,
                   },
                 ),
@@ -144,7 +136,7 @@ export const createNewsController =
             },
             {
               query: t.Object({ type: t.Union([t.Literal("HIGHLIGHT"), t.Literal("ANNOUNCEMENT")]) }),
-              response: { 200: t.Any() },
+              response: { 200: mapResponse(t.Array(NewsBulletinDTO)) },
             },
           )
           .get(
@@ -154,7 +146,24 @@ export const createNewsController =
               set.status = HttpStatusCode.OK;
               return success(newsList, "News retrieved successfully");
             },
-            NewsDocs.getNews,
+            {
+              ...NewsDocs.getNews,
+              beforeHandle({ request, set }) {
+                const params = new URL(request.url).searchParams;
+                if (params.has("tagID") || params.has("tagId")) {
+                  set.status = HttpStatusCode.BAD_REQUEST;
+                  return success(null, "Legacy tag filters are no longer supported", HttpStatusCode.BAD_REQUEST);
+                }
+              },
+            },
+          )
+          .get(
+            "/news-features",
+            ({ set }) => {
+              set.status = HttpStatusCode.NOT_FOUND;
+              return success(null, "News features endpoint has been retired", HttpStatusCode.NOT_FOUND);
+            },
+            { response: { 404: t.Any() } },
           )
           .get(
             "/:id",
@@ -166,43 +175,7 @@ export const createNewsController =
               }
               return success(news, "News retrieved successfully");
             },
-            NewsDocs.getNewsById,
-          )
-          .group("/news-features", (app) =>
-            app
-              .get(
-                "",
-                async ({ newsService, query, set }) => {
-                  const newsFeatures = await newsService.getNewsFeatures(query);
-                  set.status = HttpStatusCode.OK;
-                  return success(
-                    newsFeatures,
-                    "News features retrieved successfully",
-                  );
-                },
-                NewsDocs.getNewsFeatures,
-              )
-              .get(
-                "/:id",
-                async ({ newsService, params, set }) => {
-                  const newsFeature = await newsService.getNewsFeatureById(
-                    Number(params.id),
-                  );
-                  if (!newsFeature) {
-                    set.status = HttpStatusCode.NOT_FOUND;
-                    return success(
-                      null,
-                      "News feature not found",
-                      HttpStatusCode.NOT_FOUND,
-                    );
-                  }
-                  return success(
-                    newsFeature,
-                    "News feature retrieved successfully",
-                  );
-                },
-                NewsDocs.getNewsFeatureById,
-              ),
+            { ...NewsDocs.getNewsById, params: t.Object({ id: t.Numeric() }) },
           ),
       );
 

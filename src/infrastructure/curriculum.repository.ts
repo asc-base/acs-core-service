@@ -10,6 +10,7 @@ import {
 import { calculatePagination } from "../core/utils/calculator";
 import { AppError } from "../core/error/app-error";
 import { ErrorCode } from "../core/types/errors";
+import { HttpStatusCode } from "../core/types/http";
 import { PrismaInstance } from "../lib/db";
 import { ensureImageMedia } from "./image-media.repository";
 
@@ -20,10 +21,24 @@ export class CurriculumRepository implements ICurriculumRepository {
     data: CurriculumCreatePayload,
   ): Promise<Curriculum> {
     const { thumbnailMedia, ...fields } = data;
-    return await this.db.$transaction(async (tx) => {
-      const imageID = thumbnailMedia ? await ensureImageMedia(tx, thumbnailMedia) : null;
-      return tx.curriculum.create({ data: { ...fields, imageID }, include: { imageMedia: true } }) as unknown as Curriculum;
-    });
+    try {
+      return await this.db.$transaction(async (tx) => {
+        const imageID = thumbnailMedia ? await ensureImageMedia(tx, thumbnailMedia) : null;
+        return tx.curriculum.create({ data: { ...fields, imageID }, include: { imageMedia: true } }) as unknown as Curriculum;
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new AppError(
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "Curriculum with this year already exists",
+          HttpStatusCode.CONFICLT_ERROR,
+        );
+      }
+      throw error;
+    }
   }
 
   async getCurriculums(query: CurriculumQueryParams): Promise<Curriculum[]> {
@@ -64,16 +79,41 @@ export class CurriculumRepository implements ICurriculumRepository {
     return curriculum;
   }
 
+  async getCurriculumByYear(year: string): Promise<Curriculum | null> {
+    const curriculum = await this.db.curriculum.findFirst({
+      where: {
+        year: year,
+        deletedAt: null,
+      },
+      include: { imageMedia: true },
+    });
+    return curriculum;
+  }
+
   async updateCurriculum(
     id: number,
     data: CurriculumUpdatePayload,
   ): Promise<Curriculum> {
     const { thumbnailMedia, ...fields } = data;
-    const curriculum = await this.db.$transaction(async (tx) => {
-      const imageID = thumbnailMedia ? await ensureImageMedia(tx, thumbnailMedia) : undefined;
-      return tx.curriculum.update({ where: { id }, data: { ...fields, ...(imageID !== undefined && { imageID }) }, include: { imageMedia: true } });
-    });
-    return curriculum;
+    try {
+      const curriculum = await this.db.$transaction(async (tx) => {
+        const imageID = thumbnailMedia ? await ensureImageMedia(tx, thumbnailMedia) : undefined;
+        return tx.curriculum.update({ where: { id }, data: { ...fields, ...(imageID !== undefined && { imageID }) }, include: { imageMedia: true } });
+      });
+      return curriculum;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new AppError(
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "Curriculum with this year already exists",
+          HttpStatusCode.CONFICLT_ERROR,
+        );
+      }
+      throw error;
+    }
   }
 
   async deleteCurriculum(id: number): Promise<Curriculum> {

@@ -9,6 +9,7 @@ import { IStudentRepository } from "../modules/students/domain/student.repositor
 import { calculatePagination } from "../core/utils/calculator";
 import { AppError } from "../core/error/app-error";
 import { ErrorCode } from "../core/types/errors";
+import { HttpStatusCode } from "../core/types/http";
 import { PrismaInstance } from "../lib/db";
 
 const studentViewWhere = (
@@ -60,6 +61,16 @@ export class StudentRepository implements IStudentRepository {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new AppError(
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "A student with this student code already exists",
+          HttpStatusCode.CONFICLT_ERROR,
+        );
+      }
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2003"
       ) {
         throw new AppError(
@@ -73,12 +84,12 @@ export class StudentRepository implements IStudentRepository {
   }
 
   async getStudents(query: StudentQueryParams): Promise<Student[]> {
-    const { page = 1, pageSize = 10, orderBy = "createdAt", sortBy } = query;
+    const { page, pageSize, orderBy = "createdAt", sortBy } = query;
 
     const order = { [orderBy]: sortBy as Prisma.SortOrder };
     const rows = await this.db.userStudentView.findMany({
-      skip: calculatePagination(page, pageSize),
-      take: pageSize,
+      skip: pageSize ? calculatePagination(page ?? 1, pageSize) : undefined,
+      take: pageSize ?? undefined,
       where: studentViewWhere(query),
       orderBy: orderBy === "firstNameTh" ? order : { student: order },
       include: {
@@ -165,6 +176,13 @@ export class StudentRepository implements IStudentRepository {
             ErrorCode.NOT_FOUND_ERROR,
             "Student not found",
             404,
+          );
+        }
+        if (error.code === "P2002") {
+          throw new AppError(
+            ErrorCode.DUPLICATE_DATA_ERROR,
+            "A student with this student code already exists",
+            HttpStatusCode.CONFICLT_ERROR,
           );
         }
       }
