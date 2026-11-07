@@ -84,12 +84,12 @@ export class StudentRepository implements IStudentRepository {
   }
 
   async getStudents(query: StudentQueryParams): Promise<Student[]> {
-    const { page = 1, pageSize = 10, orderBy = "createdAt", sortBy } = query;
+    const { page, pageSize, orderBy = "createdAt", sortBy } = query;
 
     const order = { [orderBy]: sortBy as Prisma.SortOrder };
     const rows = await this.db.userStudentView.findMany({
-      skip: calculatePagination(page, pageSize),
-      take: pageSize,
+      skip: pageSize ? calculatePagination(page ?? 1, pageSize) : undefined,
+      take: pageSize ?? undefined,
       where: studentViewWhere(query),
       orderBy: orderBy === "firstNameTh" ? order : { student: order },
       include: {
