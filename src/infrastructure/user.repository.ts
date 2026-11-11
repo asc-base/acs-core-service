@@ -31,6 +31,7 @@ export class UserRepository implements IUserRepository {
           ErrorCode.DUPLICATE_DATA_ERROR,
           "A user with this email already exists",
           HttpStatusCode.CONFICLT_ERROR,
+          "email",
         );
       }
       throw error;
@@ -50,12 +51,27 @@ export class UserRepository implements IUserRepository {
   }
 
   async updateUser(userID: number, data: UpdateUserModel): Promise<User> {
-    const updatedUser = await this.db.user.update({
-      where: { id: userID, deletedAt: null },
-      data,
-      include: { prefix: true, imageMedia: true },
-    });
-    return updatedUser as User;
+    try {
+      const updatedUser = await this.db.user.update({
+        where: { id: userID, deletedAt: null },
+        data,
+        include: { prefix: true, imageMedia: true },
+      });
+      return updatedUser as User;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new AppError(
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "A user with this email already exists",
+          HttpStatusCode.CONFICLT_ERROR,
+          "email",
+        );
+      }
+      throw error;
+    }
   }
 
   async getUserByEmail(email: string): Promise<User | null> {

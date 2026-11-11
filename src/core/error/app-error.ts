@@ -5,6 +5,7 @@ export class AppError extends Error {
     public type: ErrorCode,
     public message: string,
     public statusCode: number = 400,
+    public field?: string,
   ) {
     super(message);
   }
