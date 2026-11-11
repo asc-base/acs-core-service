@@ -10,6 +10,7 @@ export const errorPlugin = (app: Elysia) =>
         data: null,
         msg: error.message,
         err: error.type,
+        ...(error.field && { field: error.field }),
       };
     }
 
