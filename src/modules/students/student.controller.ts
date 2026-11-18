@@ -12,15 +12,18 @@ import { UserFactory } from "../users/user.factory";
 import { authMiddleware } from "../../middleware/auth";
 import { roleMacro } from "../../middleware/checkRole";
 import { PERMISSION } from "../../core/permission/permission";
+import { UserRepository } from "../../infrastructure/user.repository";
 
 const userFactory = new UserFactory();
 const studentRepository = new StudentRepository(prisma);
+const userRepository = new UserRepository(prisma);
 const studentFactory = new StudentFactory(userFactory);
 const profileImageStorage = createProfileImageStorage();
 const studentUnitOfWork = new PrismaUnitOfWorkRepository(prisma);
 
 const studentService = new StudentService(
   studentRepository,
+  userRepository,
   profileImageStorage,
   studentFactory,
   studentUnitOfWork,

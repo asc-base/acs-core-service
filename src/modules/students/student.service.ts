@@ -14,11 +14,13 @@ import { IStudentRepository } from "./domain/student.repository";
 import { CreateUserModel, UpdateUserModel } from "../users/domain/user";
 import { AppError } from "../../core/error/app-error";
 import { ErrorCode } from "../../core/types/errors";
+import { HttpStatusCode } from "../../core/types/http";
 import { IStudentFactory } from "./student.factory";
 import { PageableType } from "../../core/models";
 import { IUnitOfWork } from "../../core/uow/uow.interface";
 import { ProfileImageStorage, StoredImage } from "../../infrastructure/profile-image-storage";
 import { validateProfileImage } from "../users/profile-image-validation";
+import { IUserRepository } from "../users/domain/user.repository";
 
 interface IStudentService {
   createStudent(data: CreateStudentDTO): Promise<StudentDTO>;
@@ -41,6 +43,7 @@ interface IStudentService {
 export class StudentService implements IStudentService {
   constructor(
     private readonly studentRepository: IStudentRepository,
+    private readonly userRepository: IUserRepository,
     private readonly storage: ProfileImageStorage,
     private readonly studentFactory: IStudentFactory,
     private readonly unitOfWork: IUnitOfWork,
@@ -66,6 +69,19 @@ export class StudentService implements IStudentService {
     let storedImage: StoredImage | null = null;
     let imageContentType: string | null = null;
     try {
+      const existingUser = await this.userRepository.getUserByEmail(email);
+      const existingStudent = existingUser
+        ? await this.studentRepository.getStudentByUserId(existingUser.id)
+        : null;
+
+      if (existingStudent?.deletedAt === null) {
+        throw new AppError(
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "A student with this email already exists",
+          HttpStatusCode.CONFICLT_ERROR,
+        );
+      }
+
       if (imageFile) {
         imageContentType = await validateProfileImage(imageFile);
         storedImage = await this.storage.upload(imageFile, imageContentType);
@@ -74,33 +90,67 @@ export class StudentService implements IStudentService {
       const student = await this.unitOfWork.runInTransaction(async (tx) => {
         const image = storedImage
           ? await tx.imageMedia.create({
-              ...storedImage,
-              fileName: imageFile!.name,
-              contentType: imageContentType!,
-              fileSize: imageFile!.size,
-            })
+            ...storedImage,
+            fileName: imageFile!.name,
+            contentType: imageContentType!,
+            fileSize: imageFile!.size,
+          })
           : null;
-        const rawUserData: CreateUserModel = {
+
+        const updatedUserData: UpdateUserModel = {
           prefixID,
-          email,
           firstNameTh,
           lastNameTh,
           nickName,
           firstNameEn,
           lastNameEn,
-          imageID: image?.id ?? null,
-          imageUrl: storedImage?.imageUrl ?? null,
-          imageFocalPointX,
-          imageFocalPointY,
+          ...(image && {
+            imageID: image.id,
+            imageUrl: storedImage!.imageUrl,
+            imageFocalPointX: imageFocalPointX ?? null,
+            imageFocalPointY: imageFocalPointY ?? null,
+          }),
+          ...(!image && { imageFocalPointX, imageFocalPointY }),
         };
-        const user = await tx.user.createUser(rawUserData);
-        await tx.user.assignUserRole({ userID: user.id, roleID: 2 });
+        let user;
+        if (existingUser) {
+          user = await tx.user.updateUser(existingUser.id, updatedUserData);
+          if (!existingUser.userRoles?.some((role) => role.roleID === 2)) {
+            await tx.user.assignUserRole({ userID: user.id, roleID: 2 });
+          }
+        } else {
+          const rawUserData: CreateUserModel = {
+            prefixID,
+            email,
+            firstNameTh,
+            lastNameTh,
+            nickName,
+            firstNameEn,
+            lastNameEn,
+            imageID: image?.id ?? null,
+            imageUrl: storedImage?.imageUrl ?? null,
+            imageFocalPointX,
+            imageFocalPointY,
+          };
+          user = await tx.user.createUser(rawUserData);
+          await tx.user.assignUserRole({ userID: user.id, roleID: 2 });
+        }
+
         const rawStudentData: StudentCreatePayload = {
           ...studentData,
           skills: skills ? skills.join(",") : null,
           userID: user.id,
         };
-        const student = await tx.student.createStudent(rawStudentData);
+        let student;
+        if (existingStudent) {
+          student = await tx.student.updateStudent(existingStudent.id, {
+            ...rawStudentData,
+            deletedAt: null,
+          });
+          student.user = user;
+        } else {
+          student = await tx.student.createStudent(rawStudentData);
+        }
         return this.studentFactory.MapStudentToDTO(student);
       });
       return student;
@@ -228,11 +278,11 @@ export class StudentService implements IStudentService {
       const student = await this.unitOfWork.runInTransaction(async (tx) => {
         const image = storedImage
           ? await tx.imageMedia.create({
-              ...storedImage,
-              fileName: imageFile!.name,
-              contentType: imageContentType!,
-              fileSize: imageFile!.size,
-            })
+            ...storedImage,
+            fileName: imageFile!.name,
+            contentType: imageContentType!,
+            fileSize: imageFile!.size,
+          })
           : null;
         const updatedUserData: UpdateUserModel = {
           ...userData,
@@ -372,17 +422,37 @@ export class StudentService implements IStudentService {
           ...userData
         } = record;
 
+        const existingUser = await this.userRepository.getUserByEmail(record.email);
+        const existingStudent = existingUser
+          ? await this.studentRepository.getStudentByUserId(existingUser.id)
+          : null;
+        if (existingStudent?.deletedAt === null) {
+          throw new AppError(
+            ErrorCode.DUPLICATE_DATA_ERROR,
+            `A student with email ${record.email} already exists`,
+            HttpStatusCode.CONFICLT_ERROR,
+          );
+        }
         const rawUserData: CreateUserModel = {
           ...userData,
         };
-
-        const user = await transaction.user.createUser(rawUserData);
-        await transaction.user.assignUserRole({
-          userID: user.id,
-          roleID: 2,
-        });
-
-        const rawStudentData: StudentCreatePayload = {
+        let user;
+        if (existingUser) {
+          user = await transaction.user.updateUser(existingUser.id, rawUserData);
+          if (!existingUser.userRoles?.some((role) => role.roleID === 2)) {
+            await transaction.user.assignUserRole({
+              userID: user.id,
+              roleID: 2,
+            });
+          }
+        } else {
+          user = await transaction.user.createUser(rawUserData);
+          await transaction.user.assignUserRole({
+            userID: user.id,
+            roleID: 2,
+          });
+        }
+        const rawStudentData = {
           linkedin: linkedin || null,
           github: github || null,
           facebook: facebook || null,
@@ -390,11 +460,19 @@ export class StudentService implements IStudentService {
           studentCode,
           classBookID,
           skills: skills ? skills.join(",") : null,
-          userID: user.id,
         };
-
-        await transaction.student.createStudent(rawStudentData);
+        if (existingStudent) {
+          await transaction.student.updateStudent(existingStudent.id, {
+            ...rawStudentData,
+            deletedAt: null,
+          });
+        } else {
+          await transaction.student.createStudent({
+            ...rawStudentData,
+            userID: user.id,
+          });
+        }
       }
-    });
+    })
   }
-}
+};

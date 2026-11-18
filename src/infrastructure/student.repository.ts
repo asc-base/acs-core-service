@@ -127,7 +127,32 @@ export class StudentRepository implements IStudentRepository {
   }
 
   async getStudentByUserId(userId: number): Promise<Student | null> {
-    return this.getStudentById(userId);
+    try {
+      const student = await this.db.student.findUnique({
+        where: { userID: userId },
+        include: {
+          user: {
+            include: {
+              prefix: true,
+              imageMedia: true,
+            },
+          },
+        },
+      });
+      return student as unknown as Student | null;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        return null;
+      }
+      throw new AppError(
+        ErrorCode.DATABASE_ERROR,
+        "An error occurred while fetching the student",
+        500,
+      );
+    }
   }
 
   async deleteStudent(id: number): Promise<Student> {
