@@ -133,7 +133,7 @@ export class StudentService implements IStudentService {
       ),
       totalRecords: countStudents,
       page: query.page || 1,
-      pageSize: query.pageSize || 10,
+      pageSize: query.pageSize || countStudents,
     };
   }
 

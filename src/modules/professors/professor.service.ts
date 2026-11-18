@@ -205,7 +205,7 @@ export class ProfessorService implements IProfessorService {
       rows: this.professorFactory.mapPrfessorListToDTO(professors),
       totalRecords: countProfessors,
       page: query.page || 1,
-      pageSize: query.pageSize || 10,
+      pageSize: query.pageSize || countProfessors,
     };
   }
 
