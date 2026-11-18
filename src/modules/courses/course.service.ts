@@ -51,7 +51,7 @@ export class CourseService implements ICourseService {
       rows: this.courseFactory.mapCourseListToDTO(courses),
       totalRecords: total,
       page: query.page || 1,
-      pageSize: query.pageSize || 10,
+      pageSize: query.pageSize || total,
     };
   }
 
