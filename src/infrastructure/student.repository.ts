@@ -11,6 +11,7 @@ import { AppError } from "../core/error/app-error";
 import { ErrorCode } from "../core/types/errors";
 import { HttpStatusCode } from "../core/types/http";
 import { PrismaInstance } from "../lib/db";
+import { releaseUsers } from "./release-users";
 
 const studentViewWhere = (
   query: StudentQueryParams,
@@ -132,14 +133,17 @@ export class StudentRepository implements IStudentRepository {
 
   async deleteStudent(id: number): Promise<Student> {
     try {
-      const student = await this.db.student.update({
-        where: { id },
-        data: {
-          deletedAt: new Date(),
-        },
-        include: {
-          user: { include: { prefix: true, imageMedia: true } },
-        },
+      const student = await this.db.$transaction(async (tx) => {
+        const now = new Date();
+        const deleted = await tx.student.update({
+          where: { id },
+          data: { deletedAt: now },
+          include: {
+            user: { include: { prefix: true, imageMedia: true } },
+          },
+        });
+        await releaseUsers(tx, [deleted.userID], now);
+        return deleted;
       });
       return student as Student;
     } catch (error) {

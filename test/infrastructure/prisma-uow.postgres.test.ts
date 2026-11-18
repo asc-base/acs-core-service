@@ -13,6 +13,7 @@ import { StudentRepository } from "../../src/infrastructure/student.repository";
 import { StudentFactory } from "../../src/modules/students/student.factory";
 import { StudentService } from "../../src/modules/students/student.service";
 import { ProfessorRepository } from "../../src/infrastructure/profressor.repository";
+import { ClassBookRepository } from "../../src/infrastructure/class-book.repository";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const postgresDescribe = databaseUrl ? describe : describe.skip;
@@ -290,7 +291,7 @@ postgresDescribe("Prisma unit of work with PostgreSQL", () => {
       await expect(
         service.importStudentsFromFile(file, classBookID),
       ).rejects.toMatchObject({ message: "A user with this email already exists" });
-      expect(await prisma.user.findUnique({ where: { email } })).toBeNull();
+      expect(await prisma.user.findFirst({ where: { email } })).toBeNull();
       expect(await prisma.authUser.findUnique({ where: { email } })).toBeNull();
       expect(
         await prisma.student.count({ where: { studentCode: `${studentCode}-1` } }),
@@ -300,6 +301,91 @@ postgresDescribe("Prisma unit of work with PostgreSQL", () => {
       if (classBookID) {
         await prisma.classBook.deleteMany({ where: { id: classBookID } });
       }
+      if (curriculumID) {
+        await prisma.curriculum.deleteMany({ where: { id: curriculumID } });
+      }
+    }
+  });
+
+  test("deleting a class deletes its students and lets the same students be imported again", async () => {
+    const suffix = randomUUID();
+    const emails = [`uow-a-${suffix}@example.test`, `uow-b-${suffix}@example.test`];
+    const codes = [`uow-a-${suffix}`, `uow-b-${suffix}`];
+    const classBookIDs: number[] = [];
+    let curriculumID: number | undefined;
+    try {
+      const curriculum = await prisma.curriculum.create({
+        data: {
+          title: "UOW class delete test",
+          year: randomUUID(),
+          documentURL: "",
+          description: "class delete fixture",
+          thumbnailURL: "",
+        },
+      });
+      curriculumID = curriculum.id;
+      for (const label of ["a", "b"]) {
+        const classBook = await prisma.classBook.create({
+          data: {
+            classof: `uow-${label}-${randomUUID()}`,
+            firstYearAcademic: "9999",
+            thumbnailURL: "",
+            curriculumID,
+          },
+        });
+        classBookIDs.push(classBook.id);
+      }
+      const [classA, classB] = classBookIDs as [number, number];
+
+      const service = new StudentService(
+        new StudentRepository(prisma as unknown as PrismaInstance),
+        { provider: "rustfs", upload: async () => { throw new Error("unused"); }, delete: async () => {} } as never,
+        new StudentFactory(new UserFactory()),
+        new PrismaUnitOfWorkRepository(prisma),
+      );
+      const csv = () =>
+        new File(
+          [
+            `studentCode,firstNameTh,lastNameTh,email\n${codes[0]},ชื่อ,สกุล,${emails[0]}\n${codes[1]},ชื่อสอง,สกุลสอง,${emails[1]}`,
+          ],
+          "students.csv",
+          { type: "text/csv" },
+        );
+
+      await service.importStudentsFromFile(csv(), classA);
+      const firstUsers = await prisma.user.findMany({ where: { email: { in: emails } } });
+      expect(firstUsers).toHaveLength(2);
+
+      await new ClassBookRepository(prisma as unknown as PrismaInstance).deleteClassBook(classA);
+
+      const deletedClass = await prisma.classBook.findUniqueOrThrow({ where: { id: classA } });
+      const deletedStudents = await prisma.student.findMany({ where: { classBookID: classA } });
+      const deletedUsers = await prisma.user.findMany({ where: { email: { in: emails } } });
+      expect(deletedClass.deletedAt).not.toBeNull();
+      expect(deletedStudents).toHaveLength(2);
+      for (const row of [...deletedStudents, ...deletedUsers]) {
+        expect(row.deletedAt?.getTime()).toBe(deletedClass.deletedAt?.getTime());
+      }
+      expect(
+        await prisma.authUser.count({ where: { id: { in: firstUsers.map((user) => user.id) } } }),
+      ).toBe(0);
+
+      await service.importStudentsFromFile(csv(), classB);
+
+      const activeUsers = await prisma.user.findMany({
+        where: { email: { in: emails }, deletedAt: null },
+      });
+      expect(activeUsers).toHaveLength(2);
+      expect(await prisma.student.count({ where: { classBookID: classB, deletedAt: null } })).toBe(2);
+    } finally {
+      const users = await prisma.user.findMany({ where: { email: { in: emails } } });
+      await prisma.$transaction(async (tx) => {
+        const userIDs = users.map((user) => user.id);
+        await tx.student.deleteMany({ where: { userID: { in: userIDs } } });
+        await tx.userRole.deleteMany({ where: { userID: { in: userIDs } } });
+        await tx.user.deleteMany({ where: { id: { in: userIDs } } });
+      });
+      await prisma.classBook.deleteMany({ where: { id: { in: classBookIDs } } });
       if (curriculumID) {
         await prisma.curriculum.deleteMany({ where: { id: curriculumID } });
       }
@@ -325,7 +411,7 @@ const createSuperUserData = (email: string) => ({
 });
 
 const cleanupUser = async (prisma: PrismaClient, email: string) => {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findFirst({ where: { email } });
   if (!user) return;
   await prisma.$transaction(async (tx) => {
     await tx.student.deleteMany({ where: { userID: user.id } });
