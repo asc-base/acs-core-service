@@ -46,7 +46,16 @@ export class CourseRepository implements ICourseRepository {
 
       return course as unknown as Course;
     } catch (error) {
-      this.handleDuplicateError(error);
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new AppError(
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "A course code already exists in this curriculum",
+          HttpStatusCode.CONFICLT_ERROR,
+        );
+      }
       console.log(error);
       throw error;
     }
@@ -220,32 +229,18 @@ export class CourseRepository implements ICourseRepository {
       });
       return course as unknown as Course;
     } catch (error) {
-      this.handleDuplicateError(error);
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new AppError(
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "A course code already exists in this curriculum",
+          HttpStatusCode.CONFICLT_ERROR,
+        );
+      }
       console.log(error);
       throw error;
-    }
-  }
-
-  private handleDuplicateError(error: unknown): void {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      const target = Array.isArray(error.meta?.target)
-        ? (error.meta.target as string[]).join(",")
-        : String(error.meta?.target ?? "");
-
-      const isCourseCodeDuplicate = target.includes(
-        "courses_curriculum_id_course_code_active_key",
-      );
-
-      throw new AppError(
-        ErrorCode.DUPLICATE_DATA_ERROR,
-        isCourseCodeDuplicate
-          ? "A course code already exists in this curriculum"
-          : "A prerequisite course already exists for this course",
-        HttpStatusCode.CONFICLT_ERROR,
-      );
     }
   }
 
