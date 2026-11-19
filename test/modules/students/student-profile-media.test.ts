@@ -4,6 +4,7 @@ import { Student } from "../../../src/modules/students/domain/student";
 import { StoredImage } from "../../../src/infrastructure/profile-image-storage";
 import { IUnitOfWork } from "../../../src/core/uow/uow.interface";
 import { IStudentRepository } from "../../../src/modules/students/domain/student.repository";
+import { IUserRepository } from "../../../src/modules/users/domain/user.repository";
 import { IStudentFactory } from "../../../src/modules/students/student.factory";
 import { StudentFactory } from "../../../src/modules/students/student.factory";
 import { UserFactory } from "../../../src/modules/users/user.factory";
@@ -98,6 +99,7 @@ describe("StudentService profile media", () => {
     };
     const service = new StudentService(
       repository as unknown as IStudentRepository,
+      {} as IUserRepository,
       { upload: vi.fn(), delete: vi.fn() } as never,
       new StudentFactory(new UserFactory()),
       unitOfWork as unknown as IUnitOfWork,
@@ -133,6 +135,7 @@ describe("StudentService profile media", () => {
     };
     const service = new StudentService(
       repository as unknown as IStudentRepository,
+      {} as IUserRepository,
       storage,
       {} as IStudentFactory,
       {} as IUnitOfWork,
@@ -167,7 +170,8 @@ describe("StudentService profile media", () => {
       }),
     };
     const service = new StudentService(
-      {} as IStudentRepository,
+      { getStudentByUserId: vi.fn(async () => null) } as unknown as IStudentRepository,
+      { getUserByEmail: vi.fn(async () => null) } as unknown as IUserRepository,
       storage,
       {} as IStudentFactory,
       unitOfWork as unknown as IUnitOfWork,
