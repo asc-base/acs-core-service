@@ -88,6 +88,27 @@ export class StudentService implements IStudentService {
       }
 
       const student = await this.unitOfWork.runInTransaction(async (tx) => {
+        const existingUser = await tx.user.getUserByEmail(email);
+        const existingStudent = existingUser
+          ? await tx.student.getStudentByUserId(existingUser.id)
+          : null;
+
+        if (existingStudent?.deletedAt === null) {
+          throw new AppError(
+            ErrorCode.DUPLICATE_DATA_ERROR,
+            "A student with this email already exists",
+            HttpStatusCode.CONFICLT_ERROR,
+          );
+        }
+
+        if (existingUser && !existingStudent) {
+          throw new AppError(
+            ErrorCode.DUPLICATE_DATA_ERROR,
+            "A user with this email already exists",
+            HttpStatusCode.CONFICLT_ERROR,
+          );
+        }
+
         const image = storedImage
           ? await tx.imageMedia.create({
             ...storedImage,
@@ -422,14 +443,21 @@ export class StudentService implements IStudentService {
           ...userData
         } = record;
 
-        const existingUser = await this.userRepository.getUserByEmail(record.email);
+        const existingUser = await transaction.user.getUserByEmail(record.email);
         const existingStudent = existingUser
-          ? await this.studentRepository.getStudentByUserId(existingUser.id)
+          ? await transaction.student.getStudentByUserId(existingUser.id)
           : null;
         if (existingStudent?.deletedAt === null) {
           throw new AppError(
             ErrorCode.DUPLICATE_DATA_ERROR,
             `A student with email ${record.email} already exists`,
+            HttpStatusCode.CONFICLT_ERROR,
+          );
+        }
+        if (existingUser && !existingStudent) {
+          throw new AppError(
+            ErrorCode.DUPLICATE_DATA_ERROR,
+            `A user with email ${record.email} already exists`,
             HttpStatusCode.CONFICLT_ERROR,
           );
         }
