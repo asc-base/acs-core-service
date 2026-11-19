@@ -11,6 +11,7 @@ import { AppError } from "../core/error/app-error";
 import { ErrorCode } from "../core/types/errors";
 import { HttpStatusCode } from "../core/types/http";
 import { PrismaInstance } from "../lib/db";
+import { releaseUsers } from "./release-users";
 
 const professorViewWhere = (
   query: ProfessorQueryParams,
@@ -177,15 +178,18 @@ export class ProfessorRepository implements IProfessorRepository {
     const existing = await this.getProfessorById(userID);
     if (!existing) return null;
     try {
-      const professor = await this.db.professor.update({
-        where: { id: existing.id },
-        data: {
-          deletedAt: new Date(),
-        },
-        include: {
-          user: { include: { prefix: true, imageMedia: true } },
-          educations: educationInclude,
-        },
+      const professor = await this.db.$transaction(async (tx) => {
+        const now = new Date();
+        const deleted = await tx.professor.update({
+          where: { id: existing.id },
+          data: { deletedAt: now },
+          include: {
+            user: { include: { prefix: true, imageMedia: true } },
+            educations: educationInclude,
+          },
+        });
+        await releaseUsers(tx, [deleted.userID], now);
+        return deleted;
       });
       return professor as unknown as Professor;
     } catch (error) {

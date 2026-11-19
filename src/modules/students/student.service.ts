@@ -14,6 +14,7 @@ import { IStudentRepository } from "./domain/student.repository";
 import { CreateUserModel, UpdateUserModel } from "../users/domain/user";
 import { AppError } from "../../core/error/app-error";
 import { ErrorCode } from "../../core/types/errors";
+import { HttpStatusCode } from "../../core/types/http";
 import { IStudentFactory } from "./student.factory";
 import { PageableType } from "../../core/models";
 import { IUnitOfWork } from "../../core/uow/uow.interface";
@@ -360,7 +361,7 @@ export class StudentService implements IStudentService {
       validRecords.push(parsedRow as CreateStudent);
     }
 
-    await this.unitOfWork.runInTransaction(async (transaction) => {
+    await this.unitOfWork.runInTransaction(async (tx) => {
       for (const record of validRecords) {
         const {
           linkedin,
@@ -372,12 +373,30 @@ export class StudentService implements IStudentService {
           ...userData
         } = record;
 
+        const existing = await tx.user.getUserByEmail(userData.email, {
+          includeDeleted: true,
+        });
+        if (existing && !existing.deletedAt) {
+          throw new AppError(
+            ErrorCode.DUPLICATE_DATA_ERROR,
+            "A user with this email already exists",
+            HttpStatusCode.CONFICLT_ERROR,
+          );
+        }
+
         const rawUserData: CreateUserModel = {
           ...userData,
         };
 
-        const user = await transaction.user.createUser(rawUserData);
-        await transaction.user.assignUserRole({
+        const user = existing
+          ? await tx.user.restoreUser(existing.id, {
+              ...rawUserData,
+              nickName: rawUserData.nickName ?? null,
+              firstNameEn: rawUserData.firstNameEn ?? null,
+              lastNameEn: rawUserData.lastNameEn ?? null,
+            })
+          : await tx.user.createUser(rawUserData);
+        await tx.user.assignUserRole({
           userID: user.id,
           roleID: 2,
         });
@@ -393,7 +412,14 @@ export class StudentService implements IStudentService {
           userID: user.id,
         };
 
-        await transaction.student.createStudent(rawStudentData);
+        const oldStudent = existing
+          ? await tx.student.getStudentByUserIdIncludingDeleted(user.id)
+          : null;
+        if (oldStudent) {
+          await tx.student.restoreStudent(oldStudent.id, rawStudentData);
+        } else {
+          await tx.student.createStudent(rawStudentData);
+        }
       }
     });
   }

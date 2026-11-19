@@ -11,6 +11,7 @@ import { AppError } from "../core/error/app-error";
 import { ErrorCode } from "../core/types/errors";
 import { HttpStatusCode } from "../core/types/http";
 import { PrismaInstance } from "../lib/db";
+import { releaseUsers } from "./release-users";
 
 const studentViewWhere = (
   query: StudentQueryParams,
@@ -130,16 +131,55 @@ export class StudentRepository implements IStudentRepository {
     return this.getStudentById(userId);
   }
 
-  async deleteStudent(id: number): Promise<Student> {
+  async getStudentByUserIdIncludingDeleted(
+    userId: number,
+  ): Promise<Student | null> {
+    const student = await this.db.student.findFirst({
+      where: { userID: userId },
+      include: { user: { include: { prefix: true, imageMedia: true } } },
+    });
+    return student as Student | null;
+  }
+
+  async restoreStudent(
+    id: number,
+    data: StudentCreatePayload,
+  ): Promise<Student> {
     try {
       const student = await this.db.student.update({
         where: { id },
-        data: {
-          deletedAt: new Date(),
-        },
-        include: {
-          user: { include: { prefix: true, imageMedia: true } },
-        },
+        data: { ...data, deletedAt: null },
+        include: { user: { include: { prefix: true, imageMedia: true } } },
+      });
+      return student as Student;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new AppError(
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "A student with this student code already exists",
+          HttpStatusCode.CONFICLT_ERROR,
+        );
+      }
+      throw error;
+    }
+  }
+
+  async deleteStudent(id: number): Promise<Student> {
+    try {
+      const student = await this.db.$transaction(async (tx) => {
+        const now = new Date();
+        const deleted = await tx.student.update({
+          where: { id },
+          data: { deletedAt: now },
+          include: {
+            user: { include: { prefix: true, imageMedia: true } },
+          },
+        });
+        await releaseUsers(tx, [deleted.userID], now);
+        return deleted;
       });
       return student as Student;
     } catch (error) {

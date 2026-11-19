@@ -11,6 +11,7 @@ import { AppError } from "../core/error/app-error";
 import { ErrorCode } from "../core/types/errors";
 import { PrismaInstance } from "../lib/db";
 import { ensureImageMedia } from "./image-media.repository";
+import { releaseUsers } from "./release-users";
 
 export class ClassBookRepository implements IClassBookRepository {
   constructor(private readonly db: PrismaInstance) {}
@@ -130,15 +131,29 @@ export class ClassBookRepository implements IClassBookRepository {
 
   async deleteClassBook(id: number): Promise<ClassBook> {
     try {
-      const classBook = await this.db.classBook.update({
-        where: { id },
-        data: {
-          deletedAt: new Date(),
-        },
-        include: {
-          curriculum: { include: { imageMedia: true } },
-          imageMedia: true,
-        },
+      const classBook = await this.db.$transaction(async (tx) => {
+        const now = new Date();
+        const students = await tx.student.findMany({
+          where: { classBookID: id, deletedAt: null },
+          select: { userID: true },
+        });
+        await tx.student.updateMany({
+          where: { classBookID: id, deletedAt: null },
+          data: { deletedAt: now },
+        });
+        await releaseUsers(
+          tx,
+          students.map((student) => student.userID),
+          now,
+        );
+        return tx.classBook.update({
+          where: { id },
+          data: { deletedAt: now },
+          include: {
+            curriculum: { include: { imageMedia: true } },
+            imageMedia: true,
+          },
+        });
       });
       return classBook as ClassBook;
     } catch (error) {

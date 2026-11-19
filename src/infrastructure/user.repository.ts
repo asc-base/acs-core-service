@@ -46,7 +46,11 @@ export class UserRepository implements IUserRepository {
   }
 
   async assignUserRole(data: CreateUserRoleModel): Promise<UserRole> {
-    const userRole = await this.db.userRole.create({ data });
+    const userRole = await this.db.userRole.upsert({
+      where: { userID_roleID: { userID: data.userID, roleID: data.roleID } },
+      create: data,
+      update: { deletedAt: null },
+    });
     return userRole as UserRole;
   }
 
@@ -74,9 +78,24 @@ export class UserRepository implements IUserRepository {
     }
   }
 
-  async getUserByEmail(email: string): Promise<User | null> {
+  async restoreUser(userID: number, data: UpdateUserModel): Promise<User> {
+    const restored = await this.db.user.update({
+      where: { id: userID },
+      data: { ...data, deletedAt: null },
+      include: { prefix: true, imageMedia: true },
+    });
+    return restored as User;
+  }
+
+  async getUserByEmail(
+    email: string,
+    options?: { includeDeleted?: boolean },
+  ): Promise<User | null> {
     const user = await this.db.user.findFirst({
-      where: { email: email, deletedAt: null },
+      where: {
+        email: email,
+        ...(!options?.includeDeleted && { deletedAt: null }),
+      },
       include: {
         prefix: true,
         imageMedia: true,

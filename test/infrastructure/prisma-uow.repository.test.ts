@@ -7,7 +7,7 @@ describe("PrismaUnitOfWorkRepository", () => {
     const failure = new Error("transaction failed");
     const transaction = {
       user: { create: vi.fn(async () => ({ id: 1 })) },
-      userRole: { create: vi.fn(async () => ({})) },
+      userRole: { upsert: vi.fn(async () => ({})) },
       professor: { create: vi.fn(async () => ({})) },
       student: { create: vi.fn(async () => ({})) },
       imageMedia: { create: vi.fn(async () => ({})) },
@@ -49,7 +49,7 @@ describe("PrismaUnitOfWorkRepository", () => {
 
     expect(prisma.$transaction).toHaveBeenCalledOnce();
     expect(transaction.user.create).toHaveBeenCalledOnce();
-    expect(transaction.userRole.create).toHaveBeenCalledOnce();
+    expect(transaction.userRole.upsert).toHaveBeenCalledOnce();
     expect(transaction.professor.create).toHaveBeenCalledOnce();
     expect(transaction.student.create).toHaveBeenCalledOnce();
     expect(transaction.imageMedia.create).toHaveBeenCalledOnce();

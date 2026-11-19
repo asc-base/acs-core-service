@@ -86,7 +86,9 @@ export class ProfessorService implements IProfessorService {
     const researchProfile = normalizeResearchProfileURL(research_profile);
     let storedImage: StoredImage | null = null;
     try {
-      const existingUser = await this.userRepository.getUserByEmail(email);
+      const existingUser = await this.userRepository.getUserByEmail(email, {
+        includeDeleted: true,
+      });
       const existingProfessor = existingUser
         ? await this.professorRepository.getProfessorByUserId(existingUser.id)
         : null;
@@ -131,7 +133,9 @@ export class ProfessorService implements IProfessorService {
 
         let user;
         if (existingUser) {
-          user = await tx.user.updateUser(existingUser.id, userData);
+          user = existingUser.deletedAt
+            ? await tx.user.restoreUser(existingUser.id, userData)
+            : await tx.user.updateUser(existingUser.id, userData);
         } else {
           const createUserData: CreateUserModel = {
             firstNameTh,

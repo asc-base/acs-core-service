@@ -10,6 +10,8 @@ export interface IStudentRepository {
   getStudents(query: StudentQueryParams): Promise<Student[]>;
   getStudentById(id: number): Promise<Student | null>;
   getStudentByUserId(userId: number): Promise<Student | null>;
+  getStudentByUserIdIncludingDeleted(userId: number): Promise<Student | null>;
+  restoreStudent(id: number, data: StudentCreatePayload): Promise<Student>;
 
   deleteStudent(id: number): Promise<Student>;
   updateStudent(
