@@ -131,6 +131,42 @@ export class StudentRepository implements IStudentRepository {
     return this.getStudentById(userId);
   }
 
+  async getStudentByUserIdIncludingDeleted(
+    userId: number,
+  ): Promise<Student | null> {
+    const student = await this.db.student.findFirst({
+      where: { userID: userId },
+      include: { user: { include: { prefix: true, imageMedia: true } } },
+    });
+    return student as Student | null;
+  }
+
+  async restoreStudent(
+    id: number,
+    data: StudentCreatePayload,
+  ): Promise<Student> {
+    try {
+      const student = await this.db.student.update({
+        where: { id },
+        data: { ...data, deletedAt: null },
+        include: { user: { include: { prefix: true, imageMedia: true } } },
+      });
+      return student as Student;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new AppError(
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "A student with this student code already exists",
+          HttpStatusCode.CONFICLT_ERROR,
+        );
+      }
+      throw error;
+    }
+  }
+
   async deleteStudent(id: number): Promise<Student> {
     try {
       const student = await this.db.$transaction(async (tx) => {

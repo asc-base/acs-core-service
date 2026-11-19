@@ -32,6 +32,7 @@ describe("UserService.createSuperUser", () => {
       },
       updateUser: async () => user,
       getUserByEmail: async () => null,
+      restoreUser: async () => { throw new Error("unused"); },
       getUserById: async () => null,
     };
     const authRepository: IAuthRepository = {
@@ -94,6 +95,7 @@ describe("UserService.createSuperUser", () => {
         }),
         updateUser: async () => user,
         getUserByEmail: async () => null,
+        restoreUser: async () => { throw new Error("unused"); },
         getUserById: async () => null,
       };
       const authRepository: IAuthRepository = {
@@ -143,6 +145,7 @@ describe("UserService.getUserProfile", () => {
       assignUserRole: async () => ({} as UserRole),
       updateUser: async () => user,
       getUserByEmail: async () => null,
+      restoreUser: async () => { throw new Error("unused"); },
       getUserById: async () => user,
     };
     const service = new UserService(

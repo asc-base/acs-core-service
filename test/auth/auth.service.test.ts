@@ -112,5 +112,6 @@ const createUserRepository = (user: User | null): IUserRepository => ({
     throw new Error("Not used by this test");
   },
   getUserByEmail: async () => user,
+  restoreUser: async () => { throw new Error("unused"); },
   getUserById: async () => null,
 });

@@ -307,7 +307,7 @@ postgresDescribe("Prisma unit of work with PostgreSQL", () => {
     }
   });
 
-  test("deleting a class deletes its students and lets the same students be imported again", async () => {
+  test("deleting a class deletes its students and importing the same emails restores them", async () => {
     const suffix = randomUUID();
     const emails = [`uow-a-${suffix}@example.test`, `uow-b-${suffix}@example.test`];
     const codes = [`uow-a-${suffix}`, `uow-b-${suffix}`];
@@ -376,7 +376,27 @@ postgresDescribe("Prisma unit of work with PostgreSQL", () => {
         where: { email: { in: emails }, deletedAt: null },
       });
       expect(activeUsers).toHaveLength(2);
-      expect(await prisma.student.count({ where: { classBookID: classB, deletedAt: null } })).toBe(2);
+      expect(activeUsers.map((user) => user.id).sort()).toEqual(
+        firstUsers.map((user) => user.id).sort(),
+      );
+      const restoredStudents = await prisma.student.findMany({
+        where: { userID: { in: firstUsers.map((user) => user.id) } },
+      });
+      expect(restoredStudents.map((row) => row.id).sort()).toEqual(
+        deletedStudents.map((row) => row.id).sort(),
+      );
+      for (const row of restoredStudents) {
+        expect(row.classBookID).toBe(classB);
+        expect(row.deletedAt).toBeNull();
+      }
+      expect(
+        await prisma.userRole.count({
+          where: { userID: { in: firstUsers.map((user) => user.id) }, roleID: 2 },
+        }),
+      ).toBe(2);
+      await expect(service.importStudentsFromFile(csv(), classB)).rejects.toMatchObject({
+        message: "A user with this email already exists",
+      });
     } finally {
       const users = await prisma.user.findMany({ where: { email: { in: emails } } });
       await prisma.$transaction(async (tx) => {

@@ -11,6 +11,10 @@ export interface IUserRepository {
   getUsers(): Promise<User[]>;
   assignUserRole(data: CreateUserRoleModel): Promise<UserRole>;
   updateUser(userID: number, data: UpdateUserModel): Promise<User>;
-  getUserByEmail(email: string): Promise<User | null>;
+  getUserByEmail(
+    email: string,
+    options?: { includeDeleted?: boolean },
+  ): Promise<User | null>;
+  restoreUser(userID: number, data: UpdateUserModel): Promise<User>;
   getUserById(id: number): Promise<User | null>;
 }

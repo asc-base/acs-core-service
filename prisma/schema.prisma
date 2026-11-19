@@ -52,7 +52,7 @@ model UserRole {
 
 model User {
   id            Int       @id @default(autoincrement()) @map("id")
-  email         String    @map("email")
+  email         String    @unique @map("email")
   prefixID      Int?      @map("prefix_id")
   emailVerified Boolean   @default(false) @map("email_verified")
   firstNameEn   String?   @map("first_name_en")
