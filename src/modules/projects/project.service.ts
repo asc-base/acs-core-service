@@ -85,8 +85,8 @@ export class ProjectService {
     return {
       rows: this.projectFactory.mapProjectListToDTOList(projects),
       totalRecords,
-      page: query.page ?? 1,
-      pageSize: query.pageSize ?? 10,
+      page: query.page || 1,
+      pageSize: query.pageSize || null,
     };
   }
 
