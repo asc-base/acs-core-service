@@ -7,6 +7,7 @@ import {
   CourseUpdatePayload,
 } from "../modules/courses/domain/course";
 import { calculatePagination } from "../core/utils/calculator";
+import { HttpStatusCode } from "../core/types/http";
 import { AppError } from "../core/error/app-error";
 import { ErrorCode } from "../core/types/errors";
 import { PrismaInstance } from "../lib/db";
@@ -45,6 +46,16 @@ export class CourseRepository implements ICourseRepository {
 
       return course as unknown as Course;
     } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new AppError(
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "A course code already exists in this curriculum",
+          HttpStatusCode.CONFICLT_ERROR,
+        );
+      }
       console.log(error);
       throw error;
     }
@@ -218,6 +229,16 @@ export class CourseRepository implements ICourseRepository {
       });
       return course as unknown as Course;
     } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new AppError(
+          ErrorCode.DUPLICATE_DATA_ERROR,
+          "A course code already exists in this curriculum",
+          HttpStatusCode.CONFICLT_ERROR,
+        );
+      }
       console.log(error);
       throw error;
     }

@@ -24,11 +24,10 @@ export class CourseService implements ICourseService {
   constructor(
     private readonly courseRepository: ICourseRepository,
     private readonly courseFactory: ICourseFactory,
-  ) {}
+  ) { }
 
   async createCourse(data: CreateCourseDTO): Promise<CourseDTO> {
     const { preCoursesID, ...courseData } = data;
-
     const course = await this.courseRepository.createCourse(
       {
         ...courseData,
