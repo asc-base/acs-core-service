@@ -84,13 +84,13 @@ export class CurriculumService implements ICurriculumService {
       rows: this.curriculumFactory.mapCurriculumsToDTOs(curriculums),
       totalRecords: countCurriculums,
       page: query.page || 1,
-      pageSize: query.pageSize || 10,
+      pageSize: query.pageSize || null,
     };
   }
 
   async getCurriculumById(id: number): Promise<CurriculumDTO> {
     const curriculum = await this.curriculumRepository.getCurriculumById(id);
-    
+
     if (!curriculum) {
       throw new AppError(
         ErrorCode.NOT_FOUND_ERROR,
@@ -107,7 +107,7 @@ export class CurriculumService implements ICurriculumService {
     data: UpdateCurriculumDTO,
   ): Promise<CurriculumDTO> {
     const existingCurriculum = await this.curriculumRepository.getCurriculumById(id);
-    
+
     if (!existingCurriculum) {
       throw new AppError(
         ErrorCode.NOT_FOUND_ERROR,
@@ -158,7 +158,7 @@ export class CurriculumService implements ICurriculumService {
 
   async deleteCurriculum(id: number): Promise<CurriculumDTO> {
     const deletedCurriculum = await this.curriculumRepository.deleteCurriculum(id);
-    
+
     return this.curriculumFactory.mapCurriculumToDTO(deletedCurriculum);
   }
 }
