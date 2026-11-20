@@ -84,7 +84,7 @@ export class CurriculumService implements ICurriculumService {
       rows: this.curriculumFactory.mapCurriculumsToDTOs(curriculums),
       totalRecords: countCurriculums,
       page: query.page || 1,
-      pageSize: query.pageSize || countCurriculums,
+      pageSize: query.pageSize || null,
     };
   }
 
