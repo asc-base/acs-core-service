@@ -146,7 +146,7 @@ export class NewsService implements INewsService {
       rows: this.newsFactory.mapNewsListToDTO(newsList),
       totalRecords: countNews,
       page: query.page || 1,
-      pageSize: query.pageSize || countNews,
+      pageSize: query.pageSize || null,
     };
   }
 
