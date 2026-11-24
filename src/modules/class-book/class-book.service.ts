@@ -13,6 +13,7 @@ import { detectImageContentType } from "../users/image-file-validation";
 import { AppError } from "../../core/error/app-error";
 import { ErrorCode } from "../../core/types/errors";
 import { PageableType } from "../../core/models";
+import { IUnitOfWork } from "../../core/uow/uow.interface";
 
 interface IClassBookService {
   createClassBook(data: CreateClassBookDTO): Promise<ClassBookDTO>;
@@ -29,6 +30,7 @@ export class ClassBookService implements IClassBookService {
     private readonly classBookRepository: IClassBookRepository,
     private readonly classBookFactory: IClassBookFactory,
     private readonly storage: ProfileImageStorage,
+    private readonly unitOfWork: IUnitOfWork,
   ) { }
 
   async createClassBook(data: CreateClassBookDTO): Promise<ClassBookDTO> {
@@ -124,7 +126,11 @@ export class ClassBookService implements IClassBookService {
     }
   }
   async deleteClassBook(id: number): Promise<ClassBookDTO> {
-    const classBook = await this.classBookRepository.deleteClassBook(id);
+    const classBook = await this.unitOfWork.runInTransaction(async (tx) => {
+      const deleted = await tx.classBook.deleteClassBook(id);
+      await tx.student.deleteStudentsByClassBookID(id);
+      return deleted;
+    });
     return this.classBookFactory.mapClassBookToDTO(classBook);
   }
 

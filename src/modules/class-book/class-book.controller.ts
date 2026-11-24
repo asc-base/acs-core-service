@@ -1,5 +1,6 @@
 import { Elysia } from "elysia";
 import { prisma } from "../../lib/db";
+import { PrismaUnitOfWorkRepository } from "../../infrastructure/prisma-uow.repository";
 import { ClassBookRepository } from "../../infrastructure/class-book.repository";
 import { ClassBookService } from "./class-book.service";
 import { ClassBookFactory } from "./class-book.factory";
@@ -20,6 +21,7 @@ const classBookService = new ClassBookService(
   classBookRepository,
   classBookFactory,
   imageStorage,
+  new PrismaUnitOfWorkRepository(prisma),
 );
 
 

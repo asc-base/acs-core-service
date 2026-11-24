@@ -12,6 +12,7 @@ export interface IStudentRepository {
   getStudentByUserId(userId: number): Promise<Student | null>;
 
   deleteStudent(id: number): Promise<Student>;
+  deleteStudentsByClassBookID(classBookID: number): Promise<void>;
   updateStudent(
     studentID: number,
     data: StudentUpdatePayload,
