@@ -10,6 +10,8 @@ import { IImageMediaRepository } from "../modules/users/domain/image-media.repos
 import { ImageMediaRepository } from "./image-media.repository";
 import { IAuthRepository } from "../modules/auth/domain/auth.repository";
 import { AuthRepository } from "./auth.repository";
+import { IClassBookRepository } from "../modules/class-book/domain/class-book.repository";
+import { ClassBookRepository } from "./class-book.repository";
 
 export class PrismaUnitOfWorkRepository implements IUnitOfWork {
   private _userRepository?: IUserRepository;
@@ -17,6 +19,7 @@ export class PrismaUnitOfWorkRepository implements IUnitOfWork {
   private _studentRepository?: IStudentRepository;
   private _imageMediaRepository?: IImageMediaRepository;
   private _authRepository?: IAuthRepository;
+  private _classBookRepository?: IClassBookRepository;
 
   constructor(private readonly prisma: PrismaClient) {}
   get user(): IUserRepository {
@@ -42,6 +45,11 @@ export class PrismaUnitOfWorkRepository implements IUnitOfWork {
   get auth(): IAuthRepository {
     this._authRepository ??= new AuthRepository(this.prisma);
     return this._authRepository;
+  }
+
+  get classBook(): IClassBookRepository {
+    this._classBookRepository ??= new ClassBookRepository(this.prisma);
+    return this._classBookRepository;
   }
 
   async runInTransaction<T>(fn: (uow: IUnitOfWork) => Promise<T>): Promise<T> {

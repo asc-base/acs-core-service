@@ -13,6 +13,7 @@ function setup() {
     repository as unknown as IClassBookRepository,
     new ClassBookFactory(new CurriculumFactory()),
     {} as never,
+    {} as never,
   );
   return { service, repository };
 }

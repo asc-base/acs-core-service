@@ -3,6 +3,7 @@ import { IProfessorRepository } from "../../modules/professors/domain/professor.
 import { IStudentRepository } from "../../modules/students/domain/student.repository";
 import { IImageMediaRepository } from "../../modules/users/domain/image-media.repository";
 import { IAuthRepository } from "../../modules/auth/domain/auth.repository";
+import { IClassBookRepository } from "../../modules/class-book/domain/class-book.repository";
 
 export interface IUnitOfWork {
   user: IUserRepository;
@@ -10,6 +11,7 @@ export interface IUnitOfWork {
   student: IStudentRepository;
   imageMedia: IImageMediaRepository;
   auth: IAuthRepository;
+  classBook: IClassBookRepository;
 
   commit(): Promise<void>;
   rollback(): Promise<void>;

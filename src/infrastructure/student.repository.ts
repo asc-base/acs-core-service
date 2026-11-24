@@ -155,6 +155,13 @@ export class StudentRepository implements IStudentRepository {
     }
   }
 
+  async deleteStudentsByClassBookID(classBookID: number): Promise<void> {
+    await this.db.student.updateMany({
+      where: { classBookID, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+  }
+
   async deleteStudent(id: number): Promise<Student> {
     try {
       const student = await this.db.student.update({
