@@ -8,45 +8,21 @@ import {
   ProfessorCreatePayload,
   ProfessorUpdatePayload,
 } from "./domain/professor";
-import { UpdateUserModel } from "../users/domain/user";
+import { CreateUserModel, UpdateUserModel, User } from "../users/domain/user";
 import { IProfessorRepository } from "./domain/professor.repository";
 import { IProfessorFactory } from "./profressor.factory";
-import { CreateUserModel } from "../users/domain/user";
 import { AppError } from "../../core/error/app-error";
 import { ErrorCode } from "../../core/types/errors";
 import { PageableType } from "../../core/models";
 import { IUnitOfWork } from "../../core/uow/uow.interface";
-import { ProfileImageStorage, StoredImage } from "../../infrastructure/profile-image-storage";
+import {
+  ProfileImageStorage,
+  StoredImage,
+} from "../../infrastructure/profile-image-storage";
 import { validateProfileImage } from "../users/profile-image-validation";
 
-export function normalizeResearchProfileURL(value: string | null | undefined) {
-  if (value == null) return value;
-  const normalized = value.trim();
-  if (!normalized) return null;
-  try {
-    const url = new URL(normalized);
-    if (
-      /^https?:\/\//i.test(normalized) &&
-      (url.protocol === "http:" || url.protocol === "https:") &&
-      url.hostname
-    ) {
-      return normalized;
-    }
-  } catch {
-    // Fall through to the validation error below.
-  }
-
-  throw new AppError(
-    ErrorCode.VALIDATION_ERROR,
-    "Research profile must be a full HTTP or HTTPS URL",
-    400,
-  );
-}
-
 interface IProfessorService {
-  createProfessor(
-    data: CreateProfessorDTO,
-  ): Promise<ProfessorDTO>;
+  createProfessor(data: CreateProfessorDTO): Promise<ProfessorDTO>;
   getProfessors(
     query: ProfessorQueryParams,
   ): Promise<PageableType<typeof ProfessorDTO>>;
@@ -64,131 +40,28 @@ export class ProfessorService implements IProfessorService {
     private readonly professorFactory: IProfessorFactory,
     private readonly storage: ProfileImageStorage,
     private readonly unitOfWork: IUnitOfWork,
-  ) { }
+  ) {}
 
-  async createProfessor(
-    data: CreateProfessorDTO,
-  ): Promise<ProfessorDTO> {
-    const {
-      imageFile,
-      firstNameTh,
-      firstNameEn,
-      lastNameTh,
-      lastNameEn,
-      email,
-      imageFocalPointX,
-      imageFocalPointY,
-      prefixID,
-      research_profile,
-      educations,
-      ...rawProfessorData
-    } = data;
-    const researchProfile = normalizeResearchProfileURL(research_profile);
+  async createProfessor(data: CreateProfessorDTO): Promise<ProfessorDTO> {
+    const prepared = this.prepareCreateData(data);
     let storedImage: StoredImage | null = null;
     try {
-      const existingUser = await this.userRepository.getUserByEmail(email);
-      const existingProfessor = existingUser
-        ? await this.professorRepository.getProfessorByUserId(existingUser.id)
-        : null;
-      if (existingProfessor?.deletedAt === null) {
-        throw new AppError(
-          ErrorCode.DUPLICATE_DATA_ERROR,
-          "Professor with this email already exists",
-          400,
-        );
-      }
-
-      const contentType = imageFile
-        ? await validateProfileImage(imageFile)
-        : null;
-      if (imageFile && contentType) {
-        storedImage = await this.storage.upload(imageFile, contentType);
-      }
-
-      const professor = await this.unitOfWork.runInTransaction(async (tx) => {
-        const image = storedImage
-          ? await tx.imageMedia.create({
-              ...storedImage,
-              fileName: imageFile!.name,
-              contentType: contentType!,
-              fileSize: imageFile!.size,
-            })
-          : null;
-        const userData: UpdateUserModel = {
-          firstNameTh,
-          prefixID,
-          lastNameTh,
-          firstNameEn,
-          lastNameEn,
-          ...(image && {
-            imageID: image.id,
-            imageUrl: storedImage!.imageUrl,
-            imageFocalPointX: imageFocalPointX ?? null,
-            imageFocalPointY: imageFocalPointY ?? null,
-          }),
-          ...(!image && { imageFocalPointX, imageFocalPointY }),
-        };
-
-        let user;
-        if (existingUser) {
-          user = await tx.user.updateUser(existingUser.id, userData);
-        } else {
-          const createUserData: CreateUserModel = {
-            firstNameTh,
-            lastNameTh,
-            firstNameEn,
-            lastNameEn,
-            prefixID,
-            email,
-            imageID: image?.id ?? null,
-            imageUrl: storedImage?.imageUrl ?? null,
-            imageFocalPointX: image ? imageFocalPointX ?? null : imageFocalPointX,
-            imageFocalPointY: image ? imageFocalPointY ?? null : imageFocalPointY,
-          };
-          user = await tx.user.createUser(createUserData);
-          await tx.user.assignUserRole({ userID: user.id, roleID: 3 });
-        }
-
-        let professor: Professor;
-        if (existingProfessor) {
-          professor = await tx.professor.updateProfessor(existingProfessor.id, {
-            ...rawProfessorData,
-            ...(educations !== undefined && {
-              educations: splitEducations(educations),
-            }),
-            researchProfile,
-            deletedAt: null,
-          });
-        } else {
-          const professorData: ProfessorCreatePayload = {
-            ...rawProfessorData,
-            educations: splitEducations(educations),
-            researchProfile: researchProfile ?? null,
-            userID: user.id,
-          };
-          professor = await tx.professor.createProfessor(professorData);
-          if (
-            existingUser &&
-            !existingUser.userRoles?.some((role) => role.roleID === 3)
-          ) {
-            await tx.user.assignUserRole({ userID: user.id, roleID: 3 });
-          }
-        }
-        professor.user = user;
-        return this.professorFactory.mapProfessorToDTO(professor);
-      });
-      return professor;
+      const { existingUser, existingProfessor } =
+        await this.findExistingProfessor(prepared.email);
+      this.ensureProfessorIsNotActive(existingProfessor);
+      const uploaded = await this.uploadImage(prepared.imageFile);
+      storedImage = uploaded.storedImage;
+      return await this.unitOfWork.runInTransaction((tx) =>
+        this.createProfessorInTransaction(
+          tx,
+          prepared,
+          existingUser,
+          existingProfessor,
+          uploaded,
+        ),
+      );
     } catch (error) {
-      if (storedImage) {
-        await this.storage
-          .delete(storedImage.bucket, storedImage.fileKey)
-          .catch((cleanupError) => {
-            console.error("Failed to clean up profile image", {
-              ...storedImage,
-              error: cleanupError,
-            });
-          });
-      }
+      await this.cleanupImage(storedImage);
       throw error;
     }
   }
@@ -229,6 +102,64 @@ export class ProfessorService implements IProfessorService {
     professorID: number,
     data: ProfessorUpdateDTO,
   ): Promise<ProfessorDTO | null> {
+    const prepared = this.prepareUpdateData(data);
+    const existing =
+      await this.professorRepository.getProfessorById(professorID);
+    if (!existing) return null;
+
+    let storedImage: StoredImage | null = null;
+    try {
+      const uploaded = await this.uploadImage(prepared.imageFile);
+      storedImage = uploaded.storedImage;
+      return await this.unitOfWork.runInTransaction((tx) =>
+        this.updateProfessorInTransaction(tx, existing, prepared, uploaded),
+      );
+    } catch (error) {
+      await this.cleanupImage(storedImage);
+      throw error;
+    }
+  }
+
+  private prepareCreateData(data: CreateProfessorDTO) {
+    const {
+      imageFile,
+      firstNameTh,
+      firstNameEn,
+      lastNameTh,
+      lastNameEn,
+      nickName,
+      email,
+      imageFocalPointX,
+      imageFocalPointY,
+      prefixID,
+      research_profile,
+      educations,
+      phone,
+      profRoom,
+      expertFields,
+      personnelType,
+    } = data;
+    return {
+      imageFile,
+      firstNameTh,
+      firstNameEn,
+      lastNameTh,
+      lastNameEn,
+      nickName,
+      email,
+      imageFocalPointX,
+      imageFocalPointY,
+      prefixID,
+      educations,
+      phone,
+      profRoom,
+      expertFields,
+      personnelType,
+      researchProfile: this.normalizeResearchProfileURL(research_profile),
+    };
+  }
+
+  private prepareUpdateData(data: ProfessorUpdateDTO) {
     const {
       imageFile,
       phone,
@@ -237,76 +168,259 @@ export class ProfessorService implements IProfessorService {
       expertFields,
       research_profile,
       personnelType,
-      ...UserData
+      ...userData
     } = data;
-    const existing = await this.professorRepository.getProfessorById(professorID);
-    if (!existing) return null;
+    const professorData: ProfessorUpdatePayload = {
+      ...(personnelType !== undefined && { personnelType }),
+      ...(phone !== undefined && { phone }),
+      ...(profRoom !== undefined && { profRoom }),
+      ...(educations !== undefined && {
+        educations: splitEducations(educations),
+      }),
+      ...(expertFields !== undefined && { expertFields }),
+      ...(research_profile !== undefined && {
+        researchProfile: this.normalizeResearchProfileURL(research_profile),
+      }),
+    };
+    return { imageFile, professorData, userData };
+  }
 
-    let storedImage: StoredImage | null = null;
-    let imageContentType: string | null = null;
-    try {
-      if (imageFile) {
-        imageContentType = await validateProfileImage(imageFile);
-        storedImage = await this.storage.upload(imageFile, imageContentType);
-      }
+  private async updateProfessorInTransaction(
+    tx: IUnitOfWork,
+    existing: Professor,
+    data: ReturnType<ProfessorService["prepareUpdateData"]>,
+    uploaded: Awaited<ReturnType<ProfessorService["uploadImage"]>>,
+  ): Promise<ProfessorDTO> {
+    const image = await this.createImageMedia(tx, data.imageFile, uploaded);
+    const updatedUserData: UpdateUserModel = {
+      ...data.userData,
+      ...(image && {
+        imageID: image.id,
+        imageUrl: uploaded.storedImage!.imageUrl,
+        imageFocalPointX:
+          data.userData.imageFocalPointX ??
+          existing.user.imageFocalPointX ??
+          null,
+        imageFocalPointY:
+          data.userData.imageFocalPointY ??
+          existing.user.imageFocalPointY ??
+          null,
+      }),
+      ...(!image && {
+        imageFocalPointX: data.userData.imageFocalPointX,
+        imageFocalPointY: data.userData.imageFocalPointY,
+      }),
+    };
+    const updated = await tx.professor.updateProfessor(
+      existing.id,
+      data.professorData,
+    );
+    if (Object.values(updatedUserData).some((value) => value !== undefined)) {
+      updated.user = await tx.user.updateUser(existing.userID, updatedUserData);
+    }
+    return this.professorFactory.mapProfessorToDTO(updated);
+  }
 
-      const updatedProfessor: ProfessorUpdatePayload = {
-        ...(personnelType !== undefined && { personnelType }),
-        ...(phone !== undefined && { phone }),
-        ...(profRoom !== undefined && { profRoom }),
+  private async createImageMedia(
+    tx: IUnitOfWork,
+    imageFile: File | null | undefined,
+    uploaded: Awaited<ReturnType<ProfessorService["uploadImage"]>>,
+  ) {
+    if (!uploaded.storedImage || !imageFile) return null;
+    return tx.imageMedia.create({
+      ...uploaded.storedImage,
+      fileName: imageFile.name,
+      contentType: uploaded.contentType!,
+      fileSize: imageFile.size,
+    });
+  }
+
+  private async findExistingProfessor(email: string) {
+    const existingUser = await this.userRepository.getUserByEmail(email);
+    const existingProfessor = existingUser
+      ? await this.professorRepository.getProfessorByUserId(existingUser.id)
+      : null;
+    return { existingUser, existingProfessor };
+  }
+
+  private ensureProfessorIsNotActive(
+    existingProfessor: Professor | null,
+  ): void {
+    if (existingProfessor?.deletedAt === null) {
+      throw new AppError(
+        ErrorCode.DUPLICATE_DATA_ERROR,
+        "Professor with this email already exists",
+        400,
+      );
+    }
+  }
+
+  private async uploadImage(imageFile: File | null | undefined) {
+    if (!imageFile) return { storedImage: null, contentType: null };
+    const contentType = await validateProfileImage(imageFile);
+    const storedImage = await this.storage.upload(imageFile, contentType);
+    return { storedImage, contentType };
+  }
+
+  private async createProfessorInTransaction(
+    tx: IUnitOfWork,
+    data: ReturnType<ProfessorService["prepareCreateData"]>,
+    existingUser: User | null,
+    existingProfessor: Professor | null,
+    uploaded: Awaited<ReturnType<ProfessorService["uploadImage"]>>,
+  ): Promise<ProfessorDTO> {
+    const image = await this.createImageMedia(tx, data.imageFile, uploaded);
+    const user = await this.saveProfessorUser(
+      tx,
+      data,
+      existingUser,
+      image,
+      uploaded.storedImage,
+    );
+    const professor = await this.saveProfessorProfile(
+      tx,
+      data,
+      existingUser,
+      existingProfessor,
+      user.id,
+    );
+    professor.user = user;
+    return this.professorFactory.mapProfessorToDTO(professor);
+  }
+
+  private async saveProfessorUser(
+    tx: IUnitOfWork,
+    data: ReturnType<ProfessorService["prepareCreateData"]>,
+    existingUser: User | null,
+    image: Awaited<ReturnType<IUnitOfWork["imageMedia"]["create"]>> | null,
+    storedImage: StoredImage | null,
+  ): Promise<User> {
+    const {
+      firstNameTh,
+      firstNameEn,
+      lastNameTh,
+      lastNameEn,
+      nickName,
+      prefixID,
+      email,
+      imageFocalPointX,
+      imageFocalPointY,
+    } = data;
+    const userData: UpdateUserModel = {
+      firstNameTh,
+      firstNameEn,
+      lastNameTh,
+      lastNameEn,
+      nickName,
+      prefixID,
+      ...(image && {
+        imageID: image.id,
+        imageUrl: storedImage!.imageUrl,
+        imageFocalPointX: imageFocalPointX ?? null,
+        imageFocalPointY: imageFocalPointY ?? null,
+      }),
+      ...(!image && { imageFocalPointX, imageFocalPointY }),
+    };
+    if (existingUser) return tx.user.updateUser(existingUser.id, userData);
+
+    const createUserData: CreateUserModel = {
+      firstNameTh,
+      firstNameEn,
+      lastNameTh,
+      lastNameEn,
+      nickName,
+      prefixID,
+      email,
+      imageID: image?.id ?? null,
+      imageUrl: storedImage?.imageUrl ?? null,
+      imageFocalPointX: image ? (imageFocalPointX ?? null) : imageFocalPointX,
+      imageFocalPointY: image ? (imageFocalPointY ?? null) : imageFocalPointY,
+    };
+    const user = await tx.user.createUser(createUserData);
+    await tx.user.assignUserRole({ userID: user.id, roleID: 3 });
+    return user;
+  }
+
+  private async saveProfessorProfile(
+    tx: IUnitOfWork,
+    data: ReturnType<ProfessorService["prepareCreateData"]>,
+    existingUser: User | null,
+    existingProfessor: Professor | null,
+    userID: number,
+  ): Promise<Professor> {
+    const {
+      phone,
+      profRoom,
+      expertFields,
+      personnelType,
+      educations,
+      researchProfile,
+    } = data;
+    if (existingProfessor) {
+      return tx.professor.updateProfessor(existingProfessor.id, {
+        phone,
+        profRoom,
+        expertFields,
+        personnelType,
         ...(educations !== undefined && {
           educations: splitEducations(educations),
         }),
-        ...(expertFields !== undefined && { expertFields }),
-        ...(research_profile !== undefined && {
-          researchProfile: normalizeResearchProfileURL(research_profile),
-        }),
-      };
-
-      const professor = await this.unitOfWork.runInTransaction(async (tx) => {
-        const image = storedImage
-          ? await tx.imageMedia.create({
-              ...storedImage,
-              fileName: imageFile!.name,
-              contentType: imageContentType!,
-              fileSize: imageFile!.size,
-            })
-          : null;
-        const updatedUserData: UpdateUserModel = {
-          ...UserData,
-          ...(image && {
-            imageID: image.id,
-            imageUrl: storedImage!.imageUrl,
-            imageFocalPointX:
-              UserData.imageFocalPointX ?? existing.user.imageFocalPointX ?? null,
-            imageFocalPointY:
-              UserData.imageFocalPointY ?? existing.user.imageFocalPointY ?? null,
-          }),
-          ...(!image && { imageFocalPointX: UserData.imageFocalPointX, imageFocalPointY: UserData.imageFocalPointY }),
-        };
-        const updated = await tx.professor.updateProfessor(
-          existing.id,
-          updatedProfessor,
-        );
-        if (Object.values(updatedUserData).some((value) => value !== undefined)) {
-          updated.user = await tx.user.updateUser(existing.userID, updatedUserData);
-        }
-        return this.professorFactory.mapProfessorToDTO(updated);
+        researchProfile,
+        deletedAt: null,
       });
-      return professor;
-    } catch (error) {
-      if (storedImage) {
-        await this.storage
-          .delete(storedImage.bucket, storedImage.fileKey)
-          .catch((cleanupError) => {
-            console.error("Failed to clean up profile image", {
-              ...storedImage,
-              error: cleanupError,
-            });
-          });
-      }
-      throw error;
     }
+    const professorData: ProfessorCreatePayload = {
+      phone,
+      profRoom,
+      expertFields,
+      personnelType,
+      educations: splitEducations(educations),
+      researchProfile: researchProfile ?? null,
+      userID,
+    };
+    const professor = await tx.professor.createProfessor(professorData);
+    if (
+      existingUser &&
+      !existingUser.userRoles?.some((role) => role.roleID === 3)
+    ) {
+      await tx.user.assignUserRole({ userID, roleID: 3 });
+    }
+    return professor;
+  }
+
+  private normalizeResearchProfileURL(value: string | null | undefined) {
+    if (value == null) return value;
+    const normalized = value.trim();
+    if (!normalized) return null;
+    try {
+      const url = new URL(normalized);
+      if (
+        /^https?:\/\//i.test(normalized) &&
+        (url.protocol === "http:" || url.protocol === "https:") &&
+        url.hostname
+      ) {
+        return normalized;
+      }
+    } catch {
+      // Fall through to the validation error below.
+    }
+    throw new AppError(
+      ErrorCode.VALIDATION_ERROR,
+      "Research profile must be a full HTTP or HTTPS URL",
+      400,
+    );
+  }
+
+  private async cleanupImage(storedImage: StoredImage | null): Promise<void> {
+    if (!storedImage) return;
+    await this.storage
+      .delete(storedImage.bucket, storedImage.fileKey)
+      .catch((cleanupError) => {
+        console.error("Failed to clean up profile image", {
+          ...storedImage,
+          error: cleanupError,
+        });
+      });
   }
 
   async deleteProfessor(id: number): Promise<ProfessorDTO> {
@@ -319,5 +433,10 @@ export class ProfessorService implements IProfessorService {
 }
 
 function splitEducations(educations: string | null | undefined): string[] {
-  return educations?.split("/").map((education) => education.trim()).filter(Boolean) ?? [];
+  return (
+    educations
+      ?.split("/")
+      .map((education) => education.trim())
+      .filter(Boolean) ?? []
+  );
 }
