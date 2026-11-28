@@ -5,9 +5,10 @@ import { responseEnhancer } from "../../../src/core/interceptor/response";
 import { ProjectController } from "../../../src/modules/projects/project.controller";
 import { UpdateProjectDTO } from "../../../src/modules/projects/domain/project";
 
-const { createProject, updateProject } = vi.hoisted(() => ({
+const { createProject, updateProject, getProject } = vi.hoisted(() => ({
   createProject: vi.fn(),
   updateProject: vi.fn(),
+  getProject: vi.fn(),
 }));
 
 vi.mock("../../../src/lib/db", () => ({
@@ -27,7 +28,7 @@ vi.mock("../../../src/modules/projects/project.service", () => ({
   ProjectService: class {
     createProject = createProject;
     updateProject = updateProject;
-    getProject = vi.fn();
+    getProject = getProject;
     getProjectById = vi.fn();
     deleteProject = vi.fn();
   },
@@ -99,6 +100,16 @@ beforeEach(() => {
 });
 
 describe("project controller query contract", () => {
+  test.each([
+    ["", null],
+    ["?pageSize=12", 12],
+  ])("returns pageSize for query %s", async (query, pageSize) => {
+    getProject.mockResolvedValue({ rows: [], totalRecords: 0, page: 1, pageSize });
+    const response = await projectApp().handle(new Request("http://localhost/project" + query));
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.pageSize).toBe(pageSize);
+  });
+
   test.each(["tagID=16", "tagId=16", "fields=16", "categories=2", "types=1"])(
     "rejects the retired filter %s",
     async (query) => {

@@ -13,7 +13,9 @@ const pngFile = () =>
   new File(
     [
       Uint8Array.from(
-        atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="),
+        atob(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        ),
         (byte) => byte.charCodeAt(0),
       ),
     ],
@@ -43,20 +45,26 @@ describe("ProfessorService profile media", () => {
       },
     } as Professor;
     const repository = {
-      getProfessorById: vi.fn(async (id: number) => id === 101 ? existing : null),
+      getProfessorById: vi.fn(async (id: number) =>
+        id === 101 ? existing : null,
+      ),
     };
     const tx = {
       user: {
-        updateUser: vi.fn(async (_id: number, data: Record<string, unknown>) => ({
-          ...existing.user,
-          ...data,
-        })),
+        updateUser: vi.fn(
+          async (_id: number, data: Record<string, unknown>) => ({
+            ...existing.user,
+            ...data,
+          }),
+        ),
       },
       professor: {
-        updateProfessor: vi.fn(async (_id: number, data: Record<string, unknown>) => ({
-          ...existing,
-          ...data,
-        })),
+        updateProfessor: vi.fn(
+          async (_id: number, data: Record<string, unknown>) => ({
+            ...existing,
+            ...data,
+          }),
+        ),
       },
     };
     const unitOfWork = {
@@ -72,7 +80,9 @@ describe("ProfessorService profile media", () => {
       unitOfWork as unknown as IUnitOfWork,
     );
 
-    const result = await service.updateProfessor(101, { profRoom: "2/2" } as never);
+    const result = await service.updateProfessor(101, {
+      profRoom: "2/2",
+    } as never);
 
     expect(repository.getProfessorById).toHaveBeenCalledWith(101);
     expect(tx.professor.updateProfessor).toHaveBeenCalledWith(9, {
@@ -98,23 +108,27 @@ describe("ProfessorService profile media", () => {
     const tx = {
       imageMedia: { create: vi.fn(async () => image) },
       user: {
-        updateUser: vi.fn(async (id: number, data: Record<string, unknown>) => ({
-          id,
-          ...data,
-          imageMedia: { provider: "rustfs", imageUrl: media.imageUrl },
-        })),
+        updateUser: vi.fn(
+          async (id: number, data: Record<string, unknown>) => ({
+            id,
+            ...data,
+            imageMedia: { provider: "rustfs", imageUrl: media.imageUrl },
+          }),
+        ),
       },
       professor: {
-        updateProfessor: vi.fn(async (id: number, data: Record<string, unknown>) => ({
-          id,
-          userID: 5,
-          ...data,
-        })),
+        updateProfessor: vi.fn(
+          async (id: number, data: Record<string, unknown>) => ({
+            id,
+            userID: 5,
+            ...data,
+          }),
+        ),
       },
     };
     const unitOfWork = {
-      runInTransaction: vi.fn(async (callback: (transaction: unknown) => unknown) =>
-        callback(tx),
+      runInTransaction: vi.fn(
+        async (callback: (transaction: unknown) => unknown) => callback(tx),
       ),
     };
     const storage: ProfileImageStorage = {
@@ -179,5 +193,80 @@ describe("ProfessorService profile media", () => {
       id: existingUser.id,
       professor: { id: existingProfessor.id },
     });
+  });
+  test("cleans up an uploaded image when the transaction fails", async () => {
+    const failure = new Error("transaction failed");
+    const media = {
+      provider: "rustfs" as const,
+      bucket: "media",
+      fileKey: "profile",
+      imageUrl: "https://example.com/profile",
+    };
+    const storage = {
+      provider: "rustfs" as const,
+      upload: vi.fn(async () => media),
+      delete: vi.fn(async () => {}),
+    };
+    const service = new ProfessorService(
+      {} as IProfessorRepository,
+      { getUserByEmail: vi.fn(async () => null) } as unknown as IUserRepository,
+      {} as IProfessorFactory,
+      storage,
+      {
+        runInTransaction: vi.fn(async () => {
+          throw failure;
+        }),
+      } as unknown as IUnitOfWork,
+    );
+
+    await expect(
+      service.createProfessor({
+        email: "professor@example.com",
+        imageFile: pngFile(),
+      } as never),
+    ).rejects.toBe(failure);
+    expect(storage.delete).toHaveBeenCalledWith("media", "profile");
+  });
+
+  test("preserves existing focal points when replacing a profile image", async () => {
+    const existing = {
+      id: 9,
+      userID: 101,
+      user: { imageFocalPointX: 0.3, imageFocalPointY: 0.7 },
+    };
+    const media = {
+      provider: "rustfs" as const,
+      bucket: "media",
+      fileKey: "profile",
+      imageUrl: "https://example.com/profile",
+    };
+    const tx = {
+      imageMedia: { create: vi.fn(async () => ({ id: 51 })) },
+      professor: { updateProfessor: vi.fn(async () => ({ ...existing })) },
+      user: { updateUser: vi.fn(async (_id: number, data: unknown) => data) },
+    };
+    const service = new ProfessorService(
+      {
+        getProfessorById: vi.fn(async () => existing),
+      } as unknown as IProfessorRepository,
+      {} as IUserRepository,
+      {
+        mapProfessorToDTO: vi.fn((professor) => professor),
+      } as unknown as IProfessorFactory,
+      { provider: "rustfs", upload: vi.fn(async () => media), delete: vi.fn() },
+      {
+        runInTransaction: vi.fn(async (callback) => callback(tx)),
+      } as unknown as IUnitOfWork,
+    );
+
+    await service.updateProfessor(101, { imageFile: pngFile() });
+    expect(tx.user.updateUser).toHaveBeenCalledWith(
+      101,
+      expect.objectContaining({
+        imageID: 51,
+        imageFocalPointX: 0.3,
+        imageFocalPointY: 0.7,
+      }),
+    );
   });
 });

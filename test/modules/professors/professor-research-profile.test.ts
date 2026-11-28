@@ -5,9 +5,11 @@ import { IUserRepository } from "../../../src/modules/users/domain/user.reposito
 import { IProfessorFactory } from "../../../src/modules/professors/profressor.factory";
 import { ProfessorFactory } from "../../../src/modules/professors/profressor.factory";
 import { ProfileImageStorage } from "../../../src/infrastructure/profile-image-storage";
-import { ProfessorService, normalizeResearchProfileURL } from "../../../src/modules/professors/professor.service";
+import { ProfessorService } from "../../../src/modules/professors/professor.service";
 
-const createService = (options: { existingProfessor?: { id: number; userID: number } | null } = {}) => {
+const createService = (
+  options: { existingProfessor?: { id: number; userID: number } | null } = {},
+) => {
   const tx = {
     imageMedia: { create: vi.fn() },
     user: {
@@ -16,17 +18,33 @@ const createService = (options: { existingProfessor?: { id: number; userID: numb
       updateUser: vi.fn(async (id: number) => ({ id })),
     },
     professor: {
-      createProfessor: vi.fn(async (data: Record<string, unknown>) => ({ id: 7, userID: 5, ...data })),
-      updateProfessor: vi.fn(async (id: number, data: Record<string, unknown>) => ({ id, userID: 5, ...data })),
+      createProfessor: vi.fn(async (data: Record<string, unknown>) => ({
+        id: 7,
+        userID: 5,
+        ...data,
+      })),
+      updateProfessor: vi.fn(
+        async (id: number, data: Record<string, unknown>) => ({
+          id,
+          userID: 5,
+          ...data,
+        }),
+      ),
     },
   };
   const service = new ProfessorService(
     {
-      getProfessorByUserId: vi.fn(async () => options.existingProfessor ?? null),
+      getProfessorByUserId: vi.fn(
+        async () => options.existingProfessor ?? null,
+      ),
       getProfessorById: vi.fn(async () => options.existingProfessor ?? null),
     } as unknown as IProfessorRepository,
     {
-      getUserByEmail: vi.fn(async () => options.existingProfessor ? { id: 5, userRoles: [{ roleID: 3 }] } : null),
+      getUserByEmail: vi.fn(async () =>
+        options.existingProfessor
+          ? { id: 5, userRoles: [{ roleID: 3 }] }
+          : null,
+      ),
     } as unknown as IUserRepository,
     {
       mapProfessorToDTO: vi.fn((professor) => professor),
@@ -37,25 +55,32 @@ const createService = (options: { existingProfessor?: { id: number; userID: numb
       delete: vi.fn(),
     } as unknown as ProfileImageStorage,
     {
-      runInTransaction: vi.fn(async (callback: (transaction: unknown) => unknown) => callback(tx)),
+      runInTransaction: vi.fn(
+        async (callback: (transaction: unknown) => unknown) => callback(tx),
+      ),
     } as unknown as IUnitOfWork,
   );
   return { service, tx };
 };
 
 describe("professor research profile", () => {
-  test("trims valid HTTP URLs, treats blanks as empty, and rejects other schemes", () => {
-    expect(normalizeResearchProfileURL("  https://example.edu/research  ")).toBe(
-      "https://example.edu/research",
+  test("validates research URLs through createProfessor", async () => {
+    for (const url of [
+      "ftp://example.edu/profile",
+      "https:example.edu/profile",
+      "example.edu/profile",
+    ]) {
+      await expect(
+        createService().service.createProfessor({
+          research_profile: url,
+        } as never),
+      ).rejects.toThrow("Research profile must be a full HTTP or HTTPS URL");
+    }
+    const blank = createService();
+    await blank.service.createProfessor({ research_profile: " " } as never);
+    expect(blank.tx.professor.createProfessor).toHaveBeenCalledWith(
+      expect.objectContaining({ researchProfile: null }),
     );
-    expect(normalizeResearchProfileURL(" ")).toBeNull();
-    expect(normalizeResearchProfileURL(null)).toBeNull();
-    expect(normalizeResearchProfileURL(undefined)).toBeUndefined();
-    expect(() => normalizeResearchProfileURL("ftp://example.edu/profile")).toThrow(
-      "Research profile must be a full HTTP or HTTPS URL",
-    );
-    expect(() => normalizeResearchProfileURL("https:example.edu/profile")).toThrow();
-    expect(() => normalizeResearchProfileURL("example.edu/profile")).toThrow();
   });
 
   test("includes the nullable URL in professor API responses", () => {
@@ -73,7 +98,9 @@ describe("professor research profile", () => {
       user: { prefix: null },
     } as never);
 
-    expect(result.professor.research_profile).toBe("https://example.edu/research");
+    expect(result.professor.research_profile).toBe(
+      "https://example.edu/research",
+    );
   });
 
   test("creates professors with a URL or null when omitted", async () => {
@@ -111,7 +138,9 @@ describe("professor research profile", () => {
   test("updates, clears, or preserves the URL depending on whether it is sent", async () => {
     const existingProfessor = { id: 7, userID: 5 };
     const update = createService({ existingProfessor });
-    await update.service.updateProfessor(7, { research_profile: "https://new.example.edu" });
+    await update.service.updateProfessor(7, {
+      research_profile: "https://new.example.edu",
+    });
     expect(update.tx.professor.updateProfessor).toHaveBeenCalledWith(
       7,
       expect.objectContaining({ researchProfile: "https://new.example.edu" }),
@@ -126,7 +155,8 @@ describe("professor research profile", () => {
 
     const preserve = createService({ existingProfessor });
     await preserve.service.updateProfessor(7, {});
-    const updatePayload = preserve.tx.professor.updateProfessor.mock.calls[0][1];
+    const updatePayload =
+      preserve.tx.professor.updateProfessor.mock.calls[0][1];
     expect(updatePayload).not.toHaveProperty("researchProfile");
   });
 });

@@ -32,14 +32,9 @@ export const Pageable = <T extends TSchema>(schema: T) =>
     rows: t.Array(schema),
     totalRecords: t.Number(),
     page: t.Number(),
-    pageSize: t.Number(),
+    pageSize: t.Nullable(t.Number()),
   });
 
 // 2. ตัวนี้เป็น TypeScript Type (เอาไว้ใช้ใน Service หรือ Return Type ของฟังก์ชัน)
 // ตั้งชื่อต่างกันนิดนึง (เช่น PageableType) เพื่อไม่ให้ชื่อชนกับ Function ด้านบนครับ
-export type PageableType<T extends TSchema> = {
-  rows: Static<T>[]; // ใช้ Static<T> เพื่อถอด Type ออกมาจาก Schema ที่โยนเข้ามา
-  totalRecords: number;
-  page: number;
-  pageSize: number;
-};
+export type PageableType<T extends TSchema> = Static<ReturnType<typeof Pageable<T>>>;
